@@ -8,12 +8,16 @@ import { DatabaseSync } from 'node:sqlite';
  * migrations directory next to this module.
  */
 function loadMigrationFiles(): Record<string, string> {
-	if (typeof import.meta.glob === 'function') {
+	try {
+		// Vite (dev, vitest, and the production build) statically transforms this
+		// call into bundled imports; only plain Node (the tsx CLI) throws here.
 		return import.meta.glob('./migrations/*.sql', {
 			query: '?raw',
 			import: 'default',
 			eager: true
 		}) as Record<string, string>;
+	} catch {
+		// fall through to reading the directory next to this source module
 	}
 	const dir = new URL('./migrations/', import.meta.url);
 	const files: Record<string, string> = {};
