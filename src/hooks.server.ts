@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { building } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import { sessionUser, userCount } from '$lib/server/auth';
+import { startBackupTimer } from '$lib/server/backup';
 import { migrate, open } from '$lib/server/db';
 import { redirect, type Handle } from '@sveltejs/kit';
 
@@ -11,6 +12,7 @@ function getDb(): DatabaseSync {
 	if (!db) {
 		db = open(env.FREYR_DB || 'freyr.db');
 		migrate(db);
+		startBackupTimer(db, env.FREYR_BACKUPS || 'backups');
 	}
 	return db;
 }
