@@ -1,0 +1,23 @@
+node_modules/
+
+# SvelteKit / Vite
+.svelte-kit/
+build/
+dist/
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Runtime data
+freyr.db
+freyr.db-wal
+freyr.db-shm
+backups/
+
+# Personal data — never commit the real workbook
+Finances v2.xlsx
+
+# Env / editor
+.env
+.env.*
+!.env.example
+.DS_Store
