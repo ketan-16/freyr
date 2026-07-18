@@ -1,0 +1,10 @@
+- generic [ref=e4]:
+  - heading "Welcome to Freyr" [level=1] [ref=e5]
+  - paragraph [ref=e6]: Create your account — this runs once.
+  - generic [ref=e7]:
+    - generic [ref=e8]: Username
+    - textbox "Username" [ref=e9]
+  - generic [ref=e10]:
+    - generic [ref=e11]: Password (min 8 characters)
+    - textbox "Password (min 8 characters)" [ref=e12]
+  - button "Create account" [ref=e13] [cursor=pointer]
