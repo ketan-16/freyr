@@ -9,9 +9,11 @@
 	let direction = $state('outflow');
 
 	const years = $derived.by(() => {
-		const ys = new Set([data.filters.year, Number(data.today.slice(0, 4))]);
-		for (let y = 2021; y <= Number(data.today.slice(0, 4)); y++) ys.add(y);
-		return [...ys].sort();
+		const current = Number(data.today.slice(0, 4));
+		const ys: number[] = [];
+		for (let y = Math.min(2021, data.filters.year); y <= current; y++) ys.push(y);
+		if (!ys.includes(data.filters.year)) ys.push(data.filters.year);
+		return ys.sort((a, b) => a - b);
 	});
 </script>
 

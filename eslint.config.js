@@ -34,8 +34,10 @@ export default defineConfig(
 		}
 	},
 	{
-		// Override or add rule settings here, such as:
-		// 'svelte/button-has-type': 'error'
-		rules: {}
+		rules: {
+			// Freyr serves from the root with no configurable base path; plain
+			// root-relative hrefs are correct and resolve() adds only noise.
+			'svelte/no-navigation-without-resolve': 'off'
+		}
 	}
 );

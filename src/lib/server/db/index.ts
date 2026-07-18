@@ -67,7 +67,9 @@ export function migrate(db: DatabaseSync): void {
 			db.exec('COMMIT');
 		} catch (err) {
 			db.exec('ROLLBACK');
-			throw new Error(`migration ${m.name} failed: ${err instanceof Error ? err.message : err}`);
+			throw new Error(`migration ${m.name} failed: ${err instanceof Error ? err.message : err}`, {
+				cause: err
+			});
 		}
 	}
 }
