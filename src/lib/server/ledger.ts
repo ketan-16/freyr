@@ -188,7 +188,7 @@ export function monthlyActuals(db: DatabaseSync, year: number, month: number): M
 			   COALESCE(SUM(CASE WHEN bucket = 'investments' THEN amount_paise ELSE 0 END), 0) AS invest
 			 FROM transactions WHERE date >= ? AND date < ?`
 		)
-		.get(start, end) as MonthlyActuals;
+		.get(start, end) as unknown as MonthlyActuals;
 	return row;
 }
 
