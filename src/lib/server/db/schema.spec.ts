@@ -25,8 +25,15 @@ function insertTxn(cols: Record<string, unknown>): void {
 
 describe('transactions CHECK constraints', () => {
 	it('accepts a valid income and a valid outflow', () => {
-		insertTxn({ date: '2026-07-01', amount_paise: 100, direction: 'income', income_source: 'job' });
-		insertTxn({ date: '2026-07-02', amount_paise: 100, direction: 'outflow', bucket: 'needs' });
+		expect(() => {
+			insertTxn({
+				date: '2026-07-01',
+				amount_paise: 100,
+				direction: 'income',
+				income_source: 'job'
+			});
+			insertTxn({ date: '2026-07-02', amount_paise: 100, direction: 'outflow', bucket: 'needs' });
+		}).not.toThrow();
 	});
 
 	it('rejects a zero or negative amount', () => {
