@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { mulBP, type Paise } from '$lib/money';
+import { monthlyActuals } from './ledger';
 
 export interface Period {
 	id: number;
@@ -70,4 +71,52 @@ export function allocate(
 		wants: mulBP(income, p.wantsBP),
 		invest: mulBP(income, p.investBP)
 	};
+}
+
+export interface BucketRow {
+	bucket: 'needs' | 'wants' | 'investments';
+	label: string;
+	bp: number | null;
+	allocated: Paise | null;
+	actual: Paise;
+	remaining: Paise | null;
+}
+
+export interface MonthSummary {
+	year: number;
+	month: number;
+	income: Paise;
+	period: Period | null;
+	rows: BucketRow[];
+}
+
+/** Everything the Monthly view and Home dashboard show for one month. */
+export function monthSummary(db: DatabaseSync, year: number, month: number): MonthSummary {
+	const actuals = monthlyActuals(db, year, month);
+	const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+	const period = activeFor(db, monthStart);
+	const allocation = period ? allocate(actuals.income, period) : null;
+
+	const rows: BucketRow[] = (
+		[
+			['needs', 'Needs', period?.needsBP ?? null, allocation?.needs ?? null, actuals.needs],
+			['wants', 'Wants', period?.wantsBP ?? null, allocation?.wants ?? null, actuals.wants],
+			[
+				'investments',
+				'Investments',
+				period?.investBP ?? null,
+				allocation?.invest ?? null,
+				actuals.invest
+			]
+		] as const
+	).map(([bucket, label, bp, allocated, actual]) => ({
+		bucket,
+		label,
+		bp,
+		allocated,
+		actual,
+		remaining: allocated == null ? null : allocated - actual
+	}));
+
+	return { year, month, income: actuals.income, period, rows };
 }
