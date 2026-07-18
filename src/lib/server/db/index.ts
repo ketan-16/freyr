@@ -1,14 +1,31 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
 /**
- * Migration files are bundled into the build via Vite's raw glob import,
- * so the runtime never needs to locate .sql files on disk.
+ * Migration files are bundled into the build via Vite's raw glob import, so
+ * the built app never locates .sql files on disk. Under plain Node (the tsx
+ * import CLI), import.meta.glob doesn't exist — fall back to reading the
+ * migrations directory next to this module.
  */
-const migrationFiles = import.meta.glob('./migrations/*.sql', {
-	query: '?raw',
-	import: 'default',
-	eager: true
-}) as Record<string, string>;
+function loadMigrationFiles(): Record<string, string> {
+	if (typeof import.meta.glob === 'function') {
+		return import.meta.glob('./migrations/*.sql', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		}) as Record<string, string>;
+	}
+	const dir = new URL('./migrations/', import.meta.url);
+	const files: Record<string, string> = {};
+	for (const name of readdirSync(dir)
+		.filter((f) => f.endsWith('.sql'))
+		.sort()) {
+		files[`./migrations/${name}`] = readFileSync(new URL(name, dir), 'utf8');
+	}
+	return files;
+}
+
+const migrationFiles = loadMigrationFiles();
 
 /** Opens (creating if needed) the SQLite file with the required pragmas. */
 export function open(path: string): DatabaseSync {
