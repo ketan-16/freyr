@@ -21,3 +21,6 @@ Finances v2.xlsx
 .env.*
 !.env.example
 .DS_Store
+
+# Test/browser artifacts
+.playwright-mcp/

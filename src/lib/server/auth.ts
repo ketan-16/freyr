@@ -25,9 +25,8 @@ export function createUser(db: DatabaseSync, username: string, password: string)
 
 /** Returns the user id on success, null on unknown user or wrong password. */
 export function verifyLogin(db: DatabaseSync, username: string, password: string): number | null {
-	const row = db
-		.prepare('SELECT id, password_hash FROM users WHERE username = ?')
-		.get(username) as { id: number; password_hash: string } | undefined;
+	const row = db.prepare('SELECT id, password_hash FROM users WHERE username = ?').get(username) as
+		{ id: number; password_hash: string } | undefined;
 	if (!row) return null;
 	return bcrypt.compareSync(password, row.password_hash) ? row.id : null;
 }
