@@ -9,7 +9,7 @@ import { runImport } from '../src/lib/server/importer';
 const args = process.argv.slice(2);
 const dbFlag = args.indexOf('--db');
 const dbPath = dbFlag >= 0 ? args[dbFlag + 1] : 'freyr.db';
-const xlsxPath = args.filter((_, i) => i !== dbFlag && i !== dbFlag + 1)[0];
+const xlsxPath = args.filter((_, i) => dbFlag < 0 || (i !== dbFlag && i !== dbFlag + 1))[0];
 
 if (!xlsxPath) {
 	console.error('usage: npm run import -- <xlsx path> [--db freyr.db]');
