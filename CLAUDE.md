@@ -10,14 +10,14 @@ Tech stack: @STACK.md
   ecosystem — TypeScript the TypeScript way, Svelte the Svelte way, SQL the SQL way. No
   fighting the grain of the tool.
 - **Assess performance impact before implementing.** For every feature request, state its cost
-  *before* writing code: query shape (watch for N+1 and full scans), page weight, memory, and
+  _before_ writing code: query shape (watch for N+1 and full scans), page weight, memory, and
   whether it stays fast as data grows. Propose the efficient approach, not just a working one.
   "Snappy always" is a hard requirement, not a nice-to-have.
 - **YAGNI.** Reach for the platform (Node stdlib, SvelteKit built-ins, the browser) before
   adding a dependency. Add pieces only when a concrete feature demands them.
 - **Money is never a float.** Always integer paise via `src/lib/money.ts`; percentages are
   integer basis points. JS number arithmetic on integers is exact in this range; never divide
-  without an explicit rounding rule. Enforce invariants in domain code *and* SQLite `CHECK`
+  without an explicit rounding rule. Enforce invariants in domain code _and_ SQLite `CHECK`
   constraints.
 
 ## TypeScript / SvelteKit conventions
@@ -34,7 +34,7 @@ Tech stack: @STACK.md
 ## UI / design
 
 **Super compact**, clean, and deliberately **not AI-slop**. Maximize information density — this
-is a finance app for daily power use, not a marketing page. When in doubt, fit *more* on screen,
+is a finance app for daily power use, not a marketing page. When in doubt, fit _more_ on screen,
 legibly.
 
 - **Avoid the generic AI look:** no gratuitous purple/violet gradients, no emoji used as UI

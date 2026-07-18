@@ -1,6 +1,6 @@
 # Architecture
 
-How Freyr is built. Updated as the system evolves — this reflects the *current* design, not the
+How Freyr is built. Updated as the system evolves — this reflects the _current_ design, not the
 original plan.
 
 > **Status:** early. The application is not yet scaffolded, so the sections below are

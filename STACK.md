@@ -15,14 +15,14 @@ builds, no database server.
 
 ## Core
 
-| Layer | Choice | Why |
-|---|---|---|
-| Runtime | **Node.js ≥ 22.13 LTS** | One ubiquitous cross-platform runtime; `node:sqlite` in the stdlib. |
-| Language | **TypeScript** | One typed language top to bottom. |
-| Framework | **SvelteKit 2** (Svelte 5) + `adapter-node` | Server-rendered `load` + form actions; progressive enhancement (`use:enhance`) gives instant-feeling updates with almost no client JS. |
-| Database | **SQLite** via **`node:sqlite`** (stdlib) | In-process, one file, zero install. No `better-sqlite3` native addon needed. |
-| DB access | Hand-written SQL + versioned migration files applied at boot | SQL the SQL way; a tiny migration runner, no ORM. |
-| Styling | Hand-written compact CSS (one file) | Dense, deliberate UI; no Tailwind/toolchain, no component library. |
+| Layer     | Choice                                                       | Why                                                                                                                                    |
+| --------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime   | **Node.js ≥ 22.13 LTS**                                      | One ubiquitous cross-platform runtime; `node:sqlite` in the stdlib.                                                                    |
+| Language  | **TypeScript**                                               | One typed language top to bottom.                                                                                                      |
+| Framework | **SvelteKit 2** (Svelte 5) + `adapter-node`                  | Server-rendered `load` + form actions; progressive enhancement (`use:enhance`) gives instant-feeling updates with almost no client JS. |
+| Database  | **SQLite** via **`node:sqlite`** (stdlib)                    | In-process, one file, zero install. No `better-sqlite3` native addon needed.                                                           |
+| DB access | Hand-written SQL + versioned migration files applied at boot | SQL the SQL way; a tiny migration runner, no ORM.                                                                                      |
+| Styling   | Hand-written compact CSS (one file)                          | Dense, deliberate UI; no Tailwind/toolchain, no component library.                                                                     |
 
 **Required SQLite configuration** (set on every open): `journal_mode=WAL`,
 `busy_timeout=5000`, `foreign_keys=ON` — SQLite ships with FK enforcement off, and the
@@ -38,12 +38,12 @@ explicit rounding helper. Enforced in code and by SQLite `CHECK` constraints.
 
 ## Standard add-ons (deliberately few)
 
-| Need | Choice | Notes |
-|---|---|---|
-| Auth | **`bcryptjs`** (pure JS) + session cookie backed by a sessions table | Single user, created on first run. Multi-user-ready schema. Cookies `HttpOnly` + `SameSite=Lax`; CSRF via SvelteKit's built-in origin check on form actions. |
-| Excel import | **`exceljs`** (pure JS) | One-time seed import from the old workbook, via `npm run import`. |
-| Backups | built-in: daily `VACUUM INTO backups/freyr-YYYY-MM-DD.db`, keep last 30 | One consistent snapshot file per day. **Offsite is required, not optional:** `backups/` must live in (or sync to) a replicated location (e.g. a Syncthing/Drive folder) so a dead disk can't take the app and every backup with it. |
-| TS script runner | **`tsx`** (dev-only) | Runs the import CLI script directly. |
+| Need             | Choice                                                                  | Notes                                                                                                                                                                                                                               |
+| ---------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth             | **`bcryptjs`** (pure JS) + session cookie backed by a sessions table    | Single user, created on first run. Multi-user-ready schema. Cookies `HttpOnly` + `SameSite=Lax`; CSRF via SvelteKit's built-in origin check on form actions.                                                                        |
+| Excel import     | **`exceljs`** (pure JS)                                                 | One-time seed import from the old workbook, via `npm run import`.                                                                                                                                                                   |
+| Backups          | built-in: daily `VACUUM INTO backups/freyr-YYYY-MM-DD.db`, keep last 30 | One consistent snapshot file per day. **Offsite is required, not optional:** `backups/` must live in (or sync to) a replicated location (e.g. a Syncthing/Drive folder) so a dead disk can't take the app and every backup with it. |
+| TS script runner | **`tsx`** (dev-only)                                                    | Runs the import CLI script directly.                                                                                                                                                                                                |
 
 ## Serving & security posture
 

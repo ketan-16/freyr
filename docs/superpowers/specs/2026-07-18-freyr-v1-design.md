@@ -10,32 +10,32 @@ Elixir/Phoenix and Go single-binary were dropped; feature design unchanged throu
 Freyr replaces a 12-sheet personal-finance Excel workbook with a server-rendered SvelteKit
 application. Decisions made during brainstorming:
 
-| Decision | Choice |
-|---|---|
-| Core data model | **Transaction ledger** — individual transactions; all monthly/yearly/goal views derived |
-| Historical data | **One-time seed import** from `Finances v2.xlsx` |
-| Accounts | **No bank-account model.** Buckets only — but goals track *where* money is parked (see §3.3) |
-| Build order | **Vertical phases** — each phase ships a usable slice and retires spreadsheet tabs |
-| Currency | INR only. Money = integer paise; percentages = integer basis points |
-| Users | Single user (created on first run), schema multi-user-ready |
-| Packaging | **Portable code**: the app folder + `freyr.db` on any box with Node. No native binaries anywhere |
+| Decision        | Choice                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| Core data model | **Transaction ledger** — individual transactions; all monthly/yearly/goal views derived          |
+| Historical data | **One-time seed import** from `Finances v2.xlsx`                                                 |
+| Accounts        | **No bank-account model.** Buckets only — but goals track _where_ money is parked (see §3.3)     |
+| Build order     | **Vertical phases** — each phase ships a usable slice and retires spreadsheet tabs               |
+| Currency        | INR only. Money = integer paise; percentages = integer basis points                              |
+| Users           | Single user (created on first run), schema multi-user-ready                                      |
+| Packaging       | **Portable code**: the app folder + `freyr.db` on any box with Node. No native binaries anywhere |
 
 ### What the spreadsheet contains (feature inventory)
 
-| Sheet | Becomes |
-|---|---|
-| Budget | Salary projection planner + budget % splits |
-| Monthly | Monthly budget dashboard (income → needs/wants/invest allocation vs. actual) |
-| Yearly | Yearly rollup view (job vs. side-hustle income; estimate vs. actual per bucket) |
-| Investments | SIP allocator (monthly amount split across funds) |
-| Insurance | Insurance policy registry with premium history + renewal alerts |
-| Tabs | Savings pots (short-term earmarked money) |
-| Goals | Long-horizon goals with contribution history + placement breakdown |
-| Lendings | Lending tracker with repayment schedule |
-| Cards | Card benefits reference + reward-points tracker |
-| Big Purchases | Purchase log with cost-per-year-of-use |
-| Car Buying Guide | Car affordability calculator |
-| Emergency Fund | Emergency-fund target calculator |
+| Sheet            | Becomes                                                                         |
+| ---------------- | ------------------------------------------------------------------------------- |
+| Budget           | Salary projection planner + budget % splits                                     |
+| Monthly          | Monthly budget dashboard (income → needs/wants/invest allocation vs. actual)    |
+| Yearly           | Yearly rollup view (job vs. side-hustle income; estimate vs. actual per bucket) |
+| Investments      | SIP allocator (monthly amount split across funds)                               |
+| Insurance        | Insurance policy registry with premium history + renewal alerts                 |
+| Tabs             | Savings pots (short-term earmarked money)                                       |
+| Goals            | Long-horizon goals with contribution history + placement breakdown              |
+| Lendings         | Lending tracker with repayment schedule                                         |
+| Cards            | Card benefits reference + reward-points tracker                                 |
+| Big Purchases    | Purchase log with cost-per-year-of-use                                          |
+| Car Buying Guide | Car affordability calculator                                                    |
+| Emergency Fund   | Emergency-fund target calculator                                                |
 
 Pain points the design explicitly fixes:
 
@@ -76,6 +76,7 @@ ISO-8601 (`YYYY-MM-DD`).
 ### 3.1 Ledger
 
 `transactions`
+
 - `date`, `amount_paise` (> 0), `direction` (`income | outflow`)
 - `bucket` (`needs | wants | investments`, NULL for income)
 - `income_source` (`job | side_hustle | other`, NULL for outflows; `other` = lending repayments)
@@ -249,6 +250,6 @@ for the new flows, README + ARCHITECTURE updated.
 
 - Bank feeds / statement import (CSV import can come later; ledger schema doesn't preclude it).
 - Multi-currency, multi-user UI (schema-ready; no UI investment now).
-- Investment *performance* tracking (NAV, XIRR) — the SIP allocator plans contributions only.
+- Investment _performance_ tracking (NAV, XIRR) — the SIP allocator plans contributions only.
 - Charts, PWA, Docker packaging.
 - Notifications/emails for renewals — surfaced on Home only (Phase 3).
