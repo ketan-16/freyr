@@ -3,8 +3,9 @@ import { building } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import { sessionUser, userCount } from '$lib/server/auth';
 import { startBackupTimer } from '$lib/server/backup';
+import { isCrossSiteWrite } from '$lib/server/csrf';
 import { migrate, open } from '$lib/server/db';
-import { redirect, type Handle } from '@sveltejs/kit';
+import { error, redirect, type Handle } from '@sveltejs/kit';
 
 let db: DatabaseSync | undefined;
 
@@ -21,6 +22,10 @@ const PUBLIC_PATHS = new Set(['/login', '/setup']);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	if (building) return resolve(event);
+
+	if (isCrossSiteWrite(event.request)) {
+		error(403, 'Cross-site form submissions are forbidden');
+	}
 
 	const database = getDb();
 	event.locals.db = database;
