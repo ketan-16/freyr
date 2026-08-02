@@ -14,7 +14,8 @@
 		"test": "npm run test:unit -- --run",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"import": "tsx scripts/import.ts"
+		"import": "tsx scripts/import.ts",
+		"passwd": "tsx scripts/reset-password.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
