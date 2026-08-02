@@ -19,9 +19,19 @@ function getDb(): DatabaseSync {
 }
 
 const PUBLIC_PATHS = new Set(['/login', '/setup']);
+/** Reachable whether or not you are signed in — neither redirect applies. */
+const ALWAYS_PATHS = new Set(['/theme']);
+
+/** Stamp the resolved theme onto <html> during SSR so the first paint is right. */
+function withTheme(theme: 'light' | 'dark' | null) {
+	return {
+		transformPageChunk: ({ html }: { html: string }) =>
+			html.replace('%freyr.theme%', theme ? `data-theme="${theme}"` : '')
+	};
+}
 
 export const handle: Handle = async ({ event, resolve }) => {
-	if (building) return resolve(event);
+	if (building) return resolve(event, withTheme(null));
 
 	if (isCrossSiteWrite(event.request)) {
 		error(403, 'Cross-site form submissions are forbidden');
@@ -33,13 +43,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get('freyr_session');
 	event.locals.user = token ? sessionUser(database, token) : null;
 
+	// No cookie means "follow the OS": we emit no attribute and the
+	// prefers-color-scheme block in app.css decides.
+	const cookie = event.cookies.get('freyr_theme');
+	event.locals.theme = cookie === 'dark' || cookie === 'light' ? cookie : null;
+
 	const path = event.url.pathname;
-	if (!event.locals.user && !PUBLIC_PATHS.has(path)) {
-		redirect(303, userCount(database) === 0 ? '/setup' : '/login');
-	}
-	if (event.locals.user && PUBLIC_PATHS.has(path)) {
-		redirect(303, '/');
+	if (!ALWAYS_PATHS.has(path)) {
+		if (!event.locals.user && !PUBLIC_PATHS.has(path)) {
+			redirect(303, userCount(database) === 0 ? '/setup' : '/login');
+		}
+		if (event.locals.user && PUBLIC_PATHS.has(path)) {
+			redirect(303, '/');
+		}
 	}
 
-	return resolve(event);
+	return resolve(event, withTheme(event.locals.theme));
 };

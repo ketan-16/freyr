@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import FreyrMark from '$lib/components/FreyrMark.svelte';
 
 	let { form } = $props();
 </script>
@@ -10,6 +11,7 @@
 
 <div class="auth">
 	<form class="auth-card" method="POST" use:enhance>
+		<div class="mark"><FreyrMark size={64} /></div>
 		<h1>Freyr</h1>
 		<p>Log in to continue.</p>
 		{#if form?.error}<p class="error">{form.error}</p>{/if}

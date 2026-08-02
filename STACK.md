@@ -47,7 +47,8 @@ explicit rounding helper. Enforced in code and by SQLite `CHECK` constraints.
 
 ## Serving & security posture
 
-Freyr binds to **localhost** by default (configurable via `PORT`/`HOST`). Remote/phone
+Freyr binds to **`0.0.0.0:3000`** by default — `adapter-node`'s defaults, reachable from every
+interface on the box. Set `HOST=127.0.0.1` to restrict it to localhost. Remote/phone
 access is expected via the box's network layer — trusted LAN, or better, a
 **Tailscale**/WireGuard address. Freyr does not terminate TLS; if exposure beyond a trusted
 network is ever wanted, put a reverse proxy (e.g. Caddy) in front. Do not port-forward

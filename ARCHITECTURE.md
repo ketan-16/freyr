@@ -15,10 +15,17 @@ time, never stored. See [STACK.md](STACK.md) for technology choices and rational
 ```
 src/hooks.server.ts            — boot: open+migrate db once, session cookie → locals.user,
                                  auth guard (no users → /setup, unauthenticated → /login),
+                                 theme cookie → <html data-theme> via transformPageChunk,
                                  hourly backup timer
+src/app.css                    — the whole stylesheet: design tokens (both themes),
+                                 shell, tables, forms, responsive rules. Implements DESIGN.md
 src/lib/money.ts               — integer-paise money: parse ("1,23,456.78" → paise),
                                  Indian-grouped format, basis-point math (mulBP)
 src/lib/dates.ts               — YYYY-MM-DD string helpers (no Date-object state)
+src/lib/progress.ts            — budget-meter thresholds (brand <80%, amber 80–100%,
+                                 loss >100%) and clamped bar width
+src/lib/components/            — FreyrMark (the logo, traced vector), Icon (Lucide subset,
+                                 inline paths), ThemeToggle (form action, no client state)
 src/lib/server/db/             — open (WAL, busy_timeout, foreign_keys), migration runner;
                                  migrations bundled via Vite ?raw glob (fs fallback for tsx)
 src/lib/server/auth.ts         — users (bcryptjs), sessions (sha256 token at rest, 90d)
@@ -34,7 +41,7 @@ src/lib/server/importer/       — one-time Excel seed import (exceljs), per-she
                                  single transaction, idempotent-by-refusal
 src/routes/                    — thin +page.server.ts (parse → domain → return/redirect):
                                  / (home), /ledger, /monthly, /yearly, /settings/budget,
-                                 /login, /setup, /logout
+                                 /login, /setup, /logout, /theme (POST: set cookie, bounce back)
 scripts/import.ts              — CLI import entry (tsx) with verification report
 scripts/dump-workbook.ts       — dev utility: dump an xlsx's raw cell layout
 ```
@@ -101,5 +108,20 @@ from a raw dump of the real workbook:
   accepted for pre-app history.
 - **Sessions store sha256(token), never the token.** Cookie is HttpOnly + SameSite=Lax;
   CSRF via SvelteKit's built-in origin check.
+- **Theme is a cookie resolved on the server, not client state.** `hooks.server.ts` reads
+  `freyr_theme` and stamps `data-theme` onto `<html>` through `transformPageChunk`, so the
+  correct theme is in the first byte — no flash, no blocking inline script. The toggle is a
+  form action (`POST /theme`), so it works with JavaScript off. No cookie means no attribute,
+  and `prefers-color-scheme` decides. `/theme` is exempt from both auth redirects so the
+  toggle also works on the login and setup screens.
+- **One stylesheet, no component library, no CSS build step.** Tokens are plain custom
+  properties; the dark theme re-declares them under `[data-theme='dark']` and again inside a
+  `prefers-color-scheme` block for the no-cookie case. The duplication is deliberate — the
+  alternative is a class-swap that flashes or a build step the stack rules out.
+- **Tables reflow to cards on phones with the same markup.** `data-label` attributes drive
+  `::before` labels below 40rem; cells whose value is absent omit the attribute and are
+  hidden, so there is no second mobile template to keep in sync.
+- **Design decisions live in [DESIGN.md](DESIGN.md)**, which is the target `src/app.css`
+  implements. Colour choices there are contrast-verified rather than asserted.
 
 _Add an entry here whenever a significant architectural decision is made._

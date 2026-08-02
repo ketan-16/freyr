@@ -6,6 +6,8 @@ declare global {
 		interface Locals {
 			db: DatabaseSync;
 			user: SessionUser | null;
+			/** null means "no cookie set — follow prefers-color-scheme". */
+			theme: 'light' | 'dark' | null;
 		}
 	}
 }
