@@ -2,15 +2,29 @@ import type { DatabaseSync } from 'node:sqlite';
 import { mulBP, type Paise } from '$lib/money';
 import { monthlyActuals } from './ledger';
 
+export type PeriodSource = 'base' | 'promotion' | 'manual';
+
 export interface Period {
 	id: number;
 	effectiveFrom: string;
 	needsBP: number;
 	wantsBP: number;
 	investBP: number;
+	source: PeriodSource;
 }
 
-export function createPeriod(db: DatabaseSync, p: Omit<Period, 'id'>): number {
+/**
+ * On a shared effective date a hand-typed correction beats a generated row,
+ * and a promotion beats the base. Kept identical in SQL and in memory so
+ * periodFor and activeFor can never disagree.
+ */
+const PRECEDENCE_SQL = `CASE source WHEN 'manual' THEN 2 WHEN 'promotion' THEN 1 ELSE 0 END`;
+const ORDER_SQL = `ORDER BY effective_from DESC, ${PRECEDENCE_SQL} DESC, id DESC`;
+
+const SELECT_SQL = `SELECT id, effective_from, needs_bp, wants_bp, invest_bp, source
+                    FROM budget_periods`;
+
+export function createPeriod(db: DatabaseSync, p: Omit<Period, 'id' | 'source'>): number {
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(p.effectiveFrom))
 		throw new Error('Effective-from must be YYYY-MM-DD.');
 	const sum = p.needsBP + p.wantsBP + p.investBP;
@@ -26,24 +40,24 @@ export function createPeriod(db: DatabaseSync, p: Omit<Period, 'id'>): number {
 }
 
 export function listPeriods(db: DatabaseSync): Period[] {
-	const rows = db
-		.prepare(
-			`SELECT id, effective_from, needs_bp, wants_bp, invest_bp
-			 FROM budget_periods ORDER BY effective_from DESC`
-		)
-		.all() as Record<string, unknown>[];
+	const rows = db.prepare(`${SELECT_SQL} ${ORDER_SQL}`).all() as Record<string, unknown>[];
 	return rows.map(mapPeriod);
 }
 
 export function activeFor(db: DatabaseSync, date: string): Period | null {
 	const row = db
-		.prepare(
-			`SELECT id, effective_from, needs_bp, wants_bp, invest_bp
-			 FROM budget_periods WHERE effective_from <= ?
-			 ORDER BY effective_from DESC LIMIT 1`
-		)
+		.prepare(`${SELECT_SQL} WHERE effective_from <= ? ${ORDER_SQL} LIMIT 1`)
 		.get(date) as Record<string, unknown> | undefined;
 	return row ? mapPeriod(row) : null;
+}
+
+/**
+ * The period in force on a date, from an already-fetched list. listPeriods
+ * returns rows in the same precedence order activeFor applies, so the first
+ * match wins — this lets a caller resolve twelve months with zero extra queries.
+ */
+export function periodFor(periods: Period[], date: string): Period | null {
+	return periods.find((p) => p.effectiveFrom <= date) ?? null;
 }
 
 function mapPeriod(r: Record<string, unknown>): Period {
@@ -52,7 +66,8 @@ function mapPeriod(r: Record<string, unknown>): Period {
 		effectiveFrom: r.effective_from as string,
 		needsBP: r.needs_bp as number,
 		wantsBP: r.wants_bp as number,
-		investBP: r.invest_bp as number
+		investBP: r.invest_bp as number,
+		source: r.source as PeriodSource
 	};
 }
 
