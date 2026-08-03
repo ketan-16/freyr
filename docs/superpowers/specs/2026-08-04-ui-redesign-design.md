@@ -181,17 +181,21 @@ add form, and the derived periods table tagged by `source`. Absorbs plan Task 7.
 
 Home is the only screen whose query count changes:
 
-| Query                                 | Shape                                                  |
-| ------------------------------------- | ------------------------------------------------------ |
-| `monthSummary` (current month)        | Existing — one indexed range aggregate + period lookup |
-| `monthlyActuals` (prior, through day) | One indexed range aggregate, one row                   |
-| `listTransactions({ limit: 8 })`      | Descending scan of `idx_transactions_date`, 8 rows     |
-| `goalProgress`                        | Existing                                               |
-| `openLendingsTotal`                   | Existing                                               |
+| Query                                            | Shape                                                  |
+| ------------------------------------------------ | ------------------------------------------------------ |
+| `monthSummary` (current month)                   | Existing — one indexed range aggregate + period lookup |
+| `monthlyActuals` (prior, through day)            | One indexed range aggregate, one row                   |
+| `listTransactions({ limit: 8 })`                 | Descending scan of `idx_transactions_date`, 8 rows     |
+| `goalProgress`                                   | Existing                                               |
+| `openLendingsTotal`                              | Existing                                               |
+| `listCategories` / `listGoals` / `listLocations` | Entry-bar reference lists — three small full reads     |
 
-Five bounded queries, no N+1, no full scans. Recent activity is `LIMIT`-bounded so it stays
-constant-cost as the ledger grows past a decade of transactions. No new client JavaScript beyond
-the `use:enhance` already in use, no new assets, no fonts, no images — page weight is unchanged.
+Nine bounded queries in total: the five figure-producing ones above, `monthSummary`'s internal
+period lookup, and the three reference lists the entry bar needs — the same three `/ledger`
+already performs on every load, over tables holding dozens of rows. No N+1, no full scans of
+`transactions`. Recent activity is `LIMIT`-bounded so it stays constant-cost as the ledger grows
+past a decade of transactions. No new client JavaScript beyond the `use:enhance` already in use,
+no new assets, no fonts, no images — page weight is unchanged.
 
 The yearly page's existing N+1 is killed by plan Task 6, which runs before this work.
 
