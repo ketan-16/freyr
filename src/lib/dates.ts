@@ -31,3 +31,11 @@ export function prevMonth(year: number, month: number): { year: number; month: n
 export function nextMonth(year: number, month: number): { year: number; month: number } {
 	return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
 }
+
+/**
+ * The first of the month containing an ISO date. A raise landing mid-month
+ * applies to that whole month's pay, so promotions snap here.
+ */
+export function monthStart(iso: string): string {
+	return `${iso.slice(0, 7)}-01`;
+}
