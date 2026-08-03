@@ -227,28 +227,70 @@ DROP TABLE budget_periods_old;
 Run: `npx vitest run src/lib/server/db/`
 Expected: PASS, including the pre-existing `budget_periods` constraint tests — they must keep passing, proving the rebuilt table preserved every old invariant.
 
-- [ ] **Step 5: Verify existing periods survive the migration**
+- [ ] **Step 5: Verify existing periods actually survive the upgrade**
 
-Add this test to the same describe block, then run it:
+This is the step that protects live data: the user's real `freyr.db` already holds imported `budget_periods` rows, and the `INSERT … SELECT … FROM budget_periods_old` copy only ever runs on a genuine upgrade. `testDb()` migrates an empty database, so it never exercises that path. Make the path testable by letting `migrate` stop at a version.
+
+In `src/lib/server/db/index.ts`, change the signature and the loop guard — nothing else:
 
 ```ts
-it('preserves pre-existing periods as manual rows', () => {
-	// A database migrated to 0002 only, then carried forward to 0003, keeps its rows.
-	// testDb() runs all migrations, so assert the shape the importer relies on instead.
-	const cols = db.prepare('PRAGMA table_info(budget_periods)').all() as { name: string }[];
-	expect(cols.map((c) => c.name)).toEqual(
-		expect.arrayContaining(['effective_from', 'needs_bp', 'wants_bp', 'invest_bp', 'source'])
-	);
+/**
+ * Applies bundled migrations in filename order; each runs once, inside a
+ * transaction. `upTo` stops after that version, which lets tests reproduce an
+ * older database and then upgrade it.
+ */
+export function migrate(db: DatabaseSync, upTo = Infinity): void {
+```
+
+and inside the loop, immediately after the existing `if (applied.has(m.version)) continue;`:
+
+```ts
+if (m.version > upTo) break;
+```
+
+Then write the real test in `src/lib/server/db/schema.spec.ts`:
+
+```ts
+it('preserves pre-existing periods as manual rows across the 0003 upgrade', () => {
+	const fresh = open(join(mkdtempSync(join(tmpdir(), 'freyr-upgrade-')), 'test.db'));
+	try {
+		migrate(fresh, 2); // the schema as it stood before this feature
+		fresh
+			.prepare(
+				`INSERT INTO budget_periods (effective_from, needs_bp, wants_bp, invest_bp)
+				 VALUES ('2024-08-01', 3086, 3000, 3914)`
+			)
+			.run();
+
+		migrate(fresh); // now apply 0003
+
+		const rows = fresh
+			.prepare('SELECT effective_from, needs_bp, wants_bp, invest_bp, source FROM budget_periods')
+			.all() as Record<string, unknown>[];
+		expect(rows).toEqual([
+			{
+				effective_from: '2024-08-01',
+				needs_bp: 3086,
+				wants_bp: 3000,
+				invest_bp: 3914,
+				source: 'manual'
+			}
+		]);
+	} finally {
+		fresh.close();
+	}
 });
 ```
 
-Run: `npm test`
-Expected: PASS — full suite green, confirming the importer and existing budget code are unaffected.
+Add the imports this test needs at the top of the spec file if absent: `mkdtempSync` from `node:fs`, `tmpdir` from `node:os`, `join` from `node:path`, and `migrate`/`open` from `./index`.
+
+Run: `npx vitest run src/lib/server/db/ && npm test`
+Expected: PASS — and this is the one test that proves the migration will not eat the user's imported budget periods.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/server/db/migrations/0003_promotions.sql src/lib/server/db/schema.spec.ts
+git add src/lib/server/db/migrations/0003_promotions.sql src/lib/server/db/schema.spec.ts src/lib/server/db/index.ts
 git commit -m "feat(db): promotions, budget policy and source-tagged budget periods"
 ```
 
