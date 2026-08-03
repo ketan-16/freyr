@@ -1,17 +1,12 @@
 import { todayISO } from '$lib/dates';
-import { parseMoney } from '$lib/money';
 import { listGoals, listLocations } from '$lib/server/goals';
 import {
-	createTransaction,
 	deleteTransaction,
-	ensureCategory,
 	listCategories,
 	listTransactions,
-	type Bucket,
-	type Direction,
-	type Source,
-	type TxnInput
+	type Bucket
 } from '$lib/server/ledger';
+import { createFromForm } from '$lib/server/txn-form';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -53,24 +48,7 @@ export const actions: Actions = {
 		) as Record<string, string>;
 
 		try {
-			const direction = values.direction as Direction;
-			const categoryName = values.category?.trim();
-			const goalId = values.goal ? Number(values.goal) : undefined;
-			const input: TxnInput = {
-				date: values.date,
-				amountPaise: parseMoney(values.amount || ''),
-				direction,
-				bucket: direction === 'outflow' ? (values.bucket as Bucket) : undefined,
-				incomeSource: direction === 'income' ? (values.source as Source) : undefined,
-				note: values.note?.trim() || undefined,
-				categoryId:
-					direction === 'outflow' && categoryName
-						? ensureCategory(locals.db, categoryName)
-						: undefined,
-				goalId,
-				locationId: values.location ? Number(values.location) : undefined
-			};
-			createTransaction(locals.db, input);
+			createFromForm(locals.db, values);
 		} catch (err) {
 			return fail(400, { error: err instanceof Error ? err.message : String(err), values });
 		}
