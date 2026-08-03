@@ -93,11 +93,25 @@
 						<Money value={row.allocated ?? 0} />
 					</td>
 					<td data-label="Actual" class="num amount"><Money value={row.actual} /></td>
+					<!--
+					  Before income lands there is no allocation to have anything left of,
+					  so remaining is not "0 − actual" overspend — it is nothing yet. The
+					  whole point of the awaiting-income state is to not read as three
+					  blown budgets before payday.
+					-->
 					<td
 						data-label="Remaining"
-						class="num amount {row.remaining == null ? '' : row.remaining < 0 ? 'neg' : ''}"
+						class="num amount {data.awaitingIncome || row.remaining == null
+							? ''
+							: row.remaining < 0
+								? 'neg'
+								: ''}"
 					>
-						<Money value={row.remaining ?? 0} />
+						{#if data.awaitingIncome}
+							<span class="faint">—</span>
+						{:else}
+							<Money value={row.remaining ?? 0} />
+						{/if}
 					</td>
 				</tr>
 			{/each}
