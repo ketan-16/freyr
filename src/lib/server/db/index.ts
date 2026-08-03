@@ -40,8 +40,12 @@ export function open(path: string): DatabaseSync {
 	return db;
 }
 
-/** Applies bundled migrations in filename order; each runs once, inside a transaction. */
-export function migrate(db: DatabaseSync): void {
+/**
+ * Applies bundled migrations in filename order; each runs once, inside a
+ * transaction. `upTo` stops after that version, which lets tests reproduce an
+ * older database and then upgrade it.
+ */
+export function migrate(db: DatabaseSync, upTo = Infinity): void {
 	db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 		version    INTEGER PRIMARY KEY,
 		applied_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -64,6 +68,7 @@ export function migrate(db: DatabaseSync): void {
 
 	for (const m of migrations) {
 		if (applied.has(m.version)) continue;
+		if (m.version > upTo) break;
 		db.exec('BEGIN');
 		try {
 			db.exec(m.sql);

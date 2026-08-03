@@ -144,3 +144,129 @@ describe('emergency_fund_plans single row', () => {
 		).toThrow();
 	});
 });
+
+describe('0003 promotions schema', () => {
+	it('seeds exactly one policy row with the 50/30/20 base and 20/30/50 margin', () => {
+		const row = db
+			.prepare(
+				`SELECT base_effective_from, base_needs_bp, base_wants_bp, base_invest_bp,
+				        marg_needs_bp, marg_wants_bp, marg_invest_bp
+				 FROM budget_policy`
+			)
+			.all() as Record<string, unknown>[];
+		expect(row).toHaveLength(1);
+		expect(row[0]).toMatchObject({
+			base_effective_from: '2021-09-01',
+			base_needs_bp: 5000,
+			base_wants_bp: 3000,
+			base_invest_bp: 2000,
+			marg_needs_bp: 2000,
+			marg_wants_bp: 3000,
+			marg_invest_bp: 5000
+		});
+	});
+
+	it('refuses a second policy row', () => {
+		expect(() =>
+			db
+				.prepare(
+					`INSERT INTO budget_policy (id, base_effective_from,
+					   base_needs_bp, base_wants_bp, base_invest_bp,
+					   marg_needs_bp, marg_wants_bp, marg_invest_bp)
+					 VALUES (2, '2022-01-01', 5000, 3000, 2000, 2000, 3000, 5000)`
+				)
+				.run()
+		).toThrow();
+	});
+
+	it('refuses policy triples that do not sum to 100%', () => {
+		expect(() =>
+			db.prepare('UPDATE budget_policy SET base_needs_bp = 4000 WHERE id = 1').run()
+		).toThrow();
+	});
+
+	it('refuses a non-positive or duplicate promotion', () => {
+		db.prepare('INSERT INTO promotions (effective_date, increment_bp) VALUES (?, ?)').run(
+			'2025-09-15',
+			2000
+		);
+		expect(() =>
+			db
+				.prepare('INSERT INTO promotions (effective_date, increment_bp) VALUES (?, ?)')
+				.run('2026-01-01', 0)
+		).toThrow();
+		expect(() =>
+			db
+				.prepare('INSERT INTO promotions (effective_date, increment_bp) VALUES (?, ?)')
+				.run('2025-09-15', 1000)
+		).toThrow();
+	});
+
+	it('defaults budget_periods.source to manual and allows one row per source per date', () => {
+		db.prepare(
+			`INSERT INTO budget_periods (effective_from, needs_bp, wants_bp, invest_bp)
+			 VALUES ('2025-01-01', 2720, 3000, 4280)`
+		).run();
+		const source = db
+			.prepare(`SELECT source FROM budget_periods WHERE effective_from = '2025-01-01'`)
+			.get() as { source: string };
+		expect(source.source).toBe('manual');
+
+		// same date, different source — allowed
+		db.prepare(
+			`INSERT INTO budget_periods (effective_from, needs_bp, wants_bp, invest_bp, source)
+			 VALUES ('2025-01-01', 5000, 3000, 2000, 'base')`
+		).run();
+
+		// same date, same source — rejected
+		expect(() =>
+			db
+				.prepare(
+					`INSERT INTO budget_periods (effective_from, needs_bp, wants_bp, invest_bp, source)
+					 VALUES ('2025-01-01', 5000, 3000, 2000, 'base')`
+				)
+				.run()
+		).toThrow();
+	});
+
+	it('ties promotion_id to source = promotion', () => {
+		expect(() =>
+			db
+				.prepare(
+					`INSERT INTO budget_periods (effective_from, needs_bp, wants_bp, invest_bp, source)
+					 VALUES ('2027-01-01', 5000, 3000, 2000, 'promotion')`
+				)
+				.run()
+		).toThrow();
+	});
+
+	it('preserves pre-existing periods as manual rows across the 0003 upgrade', () => {
+		const fresh = open(join(mkdtempSync(join(tmpdir(), 'freyr-upgrade-')), 'test.db'));
+		try {
+			migrate(fresh, 2); // the schema as it stood before this feature
+			fresh
+				.prepare(
+					`INSERT INTO budget_periods (effective_from, needs_bp, wants_bp, invest_bp)
+					 VALUES ('2024-08-01', 3086, 3000, 3914)`
+				)
+				.run();
+
+			migrate(fresh); // now apply 0003
+
+			const rows = fresh
+				.prepare('SELECT effective_from, needs_bp, wants_bp, invest_bp, source FROM budget_periods')
+				.all() as Record<string, unknown>[];
+			expect(rows).toEqual([
+				{
+					effective_from: '2024-08-01',
+					needs_bp: 3086,
+					wants_bp: 3000,
+					invest_bp: 3914,
+					source: 'manual'
+				}
+			]);
+		} finally {
+			fresh.close();
+		}
+	});
+});
