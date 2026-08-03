@@ -463,6 +463,70 @@ h2 {
 	font-variant-numeric: tabular-nums;
 }
 
+/* ---- Hero & delta ------------------------------------------------------ */
+
+.hero {
+	display: flex;
+	align-items: baseline;
+	gap: var(--space-3);
+	flex-wrap: wrap;
+	margin: 0 0 var(--space-1);
+}
+
+.hero .figure {
+	font-size: var(--t-hero);
+	font-weight: 600;
+	line-height: 1.15;
+	letter-spacing: -0.01em;
+	font-variant-numeric: tabular-nums;
+}
+
+.hero-sub {
+	margin: 0 0 var(--space-4);
+	font-size: var(--t-body);
+	color: var(--ink-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.delta {
+	display: inline-flex;
+	align-items: baseline;
+	gap: var(--space-0);
+	font-size: var(--t-body);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.delta.pos {
+	color: var(--gain);
+}
+
+.delta.neg {
+	color: var(--loss);
+}
+
+.delta.flat {
+	color: var(--ink-faint);
+}
+
+.delta .muted {
+	margin-left: var(--space-1);
+}
+
+/* A meter and its figure share a line; the figure is the truth. */
+.meter-cell {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.meter-cell .pct {
+	font-variant-numeric: tabular-nums;
+	color: var(--ink-muted);
+	min-width: 2.5rem;
+	text-align: right;
+}
+
 /* ---- Tables ------------------------------------------------------------ */
 
 /* Deliberately not a scroll container: `overflow-x: auto` computes overflow-y
@@ -566,7 +630,7 @@ td form {
 }
 
 .meter {
-	display: inline-block;
+	display: inline-flex;
 	vertical-align: middle;
 	width: 8rem;
 	max-width: 100%;
@@ -576,19 +640,27 @@ td form {
 	overflow: hidden;
 }
 
-.meter > span {
-	display: block;
+.meter > .fill {
 	height: 100%;
 	background: var(--brand);
-	border-radius: var(--r-full);
 }
 
-.meter.warn > span {
+.meter.warn > .fill {
 	background: var(--accent);
 }
 
-.meter.over > span {
+.meter.over > .fill {
 	background: var(--loss);
+}
+
+/* The excess past the allocation cap. Same red at lower emphasis, split from
+   the allocation by a hairline in the surface colour so the 100% line is
+   visible rather than implied. */
+.meter > .over-seg {
+	height: 100%;
+	background: var(--loss);
+	opacity: 0.45;
+	border-left: 1px solid var(--surface);
 }
 
 /* ---- Forms ------------------------------------------------------------- */
