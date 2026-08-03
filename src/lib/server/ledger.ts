@@ -94,6 +94,8 @@ export interface TxnFilter {
 	year?: number;
 	month?: number;
 	bucket?: Bucket;
+	/** Newest-first cap, for short activity lists. Keeps the query constant-cost. */
+	limit?: number;
 }
 
 /** Half-open [start, end) date range for a month or a whole year. */
@@ -128,9 +130,10 @@ export function listTransactions(db: DatabaseSync, f: TxnFilter): Txn[] {
 			 LEFT JOIN locations loc ON loc.id = t.location_id
 			 LEFT JOIN lendings l ON l.id = t.lending_id
 			 ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-			 ORDER BY t.date DESC, t.id DESC`
+			 ORDER BY t.date DESC, t.id DESC
+			 ${f.limit ? 'LIMIT ?' : ''}`
 		)
-		.all(...params) as Record<string, unknown>[];
+		.all(...params, ...(f.limit ? [f.limit] : [])) as Record<string, unknown>[];
 
 	return rows.map((r) => ({
 		id: r.id as number,
@@ -176,7 +179,17 @@ export interface MonthlyActuals {
 	invest: Paise;
 }
 
-export function monthlyActuals(db: DatabaseSync, year: number, month: number): MonthlyActuals {
+/** Narrows a half-open range by an exclusive bound, ignoring one that falls outside. */
+function capped(end: string, through?: string): string {
+	return through && through < end ? through : end;
+}
+
+export function monthlyActuals(
+	db: DatabaseSync,
+	year: number,
+	month: number,
+	through?: string
+): MonthlyActuals {
 	const [start, end] = dateRange(year, month);
 	const row = db
 		.prepare(
@@ -188,7 +201,7 @@ export function monthlyActuals(db: DatabaseSync, year: number, month: number): M
 			   COALESCE(SUM(CASE WHEN bucket = 'investments' THEN amount_paise ELSE 0 END), 0) AS invest
 			 FROM transactions WHERE date >= ? AND date < ?`
 		)
-		.get(start, end) as unknown as MonthlyActuals;
+		.get(start, capped(end, through)) as unknown as MonthlyActuals;
 	return row;
 }
 
@@ -200,7 +213,7 @@ export interface YearlySummary {
 	invest: Paise;
 }
 
-export function yearlySummary(db: DatabaseSync, year: number): YearlySummary {
+export function yearlySummary(db: DatabaseSync, year: number, through?: string): YearlySummary {
 	const [start, end] = dateRange(year);
 	const row = db
 		.prepare(
@@ -212,7 +225,7 @@ export function yearlySummary(db: DatabaseSync, year: number): YearlySummary {
 			   COALESCE(SUM(CASE WHEN bucket = 'investments' THEN amount_paise ELSE 0 END), 0) AS invest
 			 FROM transactions WHERE date >= ? AND date < ?`
 		)
-		.get(start, end) as Record<string, number>;
+		.get(start, capped(end, through)) as Record<string, number>;
 	return {
 		job: row.job,
 		sideHustle: row.side_hustle,

@@ -210,4 +210,44 @@ describe('rollups', () => {
 		expect(years(db)).toEqual([2026]);
 		expect(monthsWithData(db, 2026)).toEqual([6, 7]);
 	});
+
+	it('monthlyActuals honours an exclusive through bound', () => {
+		// Through the 8th, exclusive: the 1st, 5th, 6th and 7th only.
+		const m = monthlyActuals(db, 2026, 7, '2026-07-08');
+		expect(m).toEqual({
+			income: 14520900,
+			needs: 3000000,
+			wants: 0,
+			invest: 0
+		});
+	});
+
+	it('ignores a through bound past the end of the month', () => {
+		expect(monthlyActuals(db, 2026, 7, '2026-09-01')).toEqual(monthlyActuals(db, 2026, 7));
+	});
+
+	it('returns nothing for a through bound before the month starts', () => {
+		expect(monthlyActuals(db, 2026, 7, '2026-06-01')).toEqual({
+			income: 0,
+			needs: 0,
+			wants: 0,
+			invest: 0
+		});
+	});
+
+	it('yearlySummary honours an exclusive through bound', () => {
+		// Only 30 June falls before 1 July.
+		expect(yearlySummary(db, 2026, '2026-07-01')).toEqual({
+			job: 0,
+			sideHustle: 0,
+			needs: 99900,
+			wants: 0,
+			invest: 0
+		});
+	});
+
+	it('listTransactions limits to the newest rows', () => {
+		const rows = listTransactions(db, { limit: 2 });
+		expect(rows.map((r) => r.date)).toEqual(['2026-07-09', '2026-07-08']);
+	});
 });
