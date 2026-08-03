@@ -1,6 +1,7 @@
 import { isRedirect } from '@sveltejs/kit';
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { MONTH_NAMES, prevMonth, todayISO } from '$lib/dates';
 import { createPeriod } from '$lib/server/budgets';
 import { createGoal, ensureLocation } from '$lib/server/goals';
 import { createTransaction, listTransactions } from '$lib/server/ledger';
@@ -205,5 +206,106 @@ describe('home page', () => {
 		expect(data.goals[0].contributed).toBe(5000000);
 		expect(data.lendingsOutstanding).toBe(18600000);
 		expect(data.summary.rows).toHaveLength(3);
+	});
+});
+
+describe('home command centre', () => {
+	// `/` always loads the real current month, so these seed relative to today
+	// rather than at fixed dates that would drift out of range.
+	const today = todayISO();
+	const year = Number(today.slice(0, 4));
+	const month = Number(today.slice(5, 7));
+
+	it('compares this month against the same days of last month', () => {
+		const prev = prevMonth(year, month);
+		// The 1st of last month falls inside "through the same day" for any
+		// day-of-month today can be.
+		const prevFirst = `${prev.year}-${String(prev.month).padStart(2, '0')}-01`;
+		createTransaction(db, {
+			date: prevFirst,
+			amountPaise: 800000,
+			direction: 'outflow',
+			bucket: 'needs'
+		});
+
+		const data = home.load(event('/')) as any;
+		expect(data.prior.spent).toBe(800000);
+		expect(data.prior.label).toBe(MONTH_NAMES[prev.month - 1]);
+	});
+
+	it('reports awaiting-income when no income is booked yet', () => {
+		createPeriod(db, { effectiveFrom: '2020-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		createTransaction(db, {
+			date: today,
+			amountPaise: 350000,
+			direction: 'outflow',
+			bucket: 'needs'
+		});
+
+		const data = home.load(event('/')) as any;
+		expect(data.awaitingIncome).toBe(true);
+		expect(data.spent).toBe(350000);
+		// Allocation is a share of booked income, so zero income allocates zero
+		// even with a period in force. `formatCell` renders that 0 as an em
+		// dash, which is exactly the "nothing here yet" the state needs — no
+		// special-casing in the markup.
+		expect(data.summary.rows.every((r: any) => r.allocated === 0)).toBe(true);
+	});
+
+	it('clears awaiting-income once income lands', () => {
+		createPeriod(db, { effectiveFrom: '2020-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		createTransaction(db, {
+			date: today,
+			amountPaise: 10000000,
+			direction: 'income',
+			incomeSource: 'job'
+		});
+
+		const data = home.load(event('/')) as any;
+		expect(data.awaitingIncome).toBe(false);
+	});
+
+	it('returns a bounded recent-activity list, newest first', () => {
+		for (let d = 1; d <= 10; d++) {
+			createTransaction(db, {
+				date: `2026-01-${String(d).padStart(2, '0')}`,
+				amountPaise: d * 1000,
+				direction: 'outflow',
+				bucket: 'needs'
+			});
+		}
+
+		const data = home.load(event('/')) as any;
+		expect(data.recent).toHaveLength(8);
+		expect(data.recent[0].date).toBe('2026-01-10');
+	});
+
+	it('create action inserts and redirects home', async () => {
+		await expect(
+			home.actions.create(
+				event('/?/create', {
+					date: '2026-07-10',
+					amount: '1,250.50',
+					direction: 'outflow',
+					bucket: 'wants',
+					category: 'Eating out'
+				})
+			)
+		).rejects.toSatisfy((e: unknown) => isRedirect(e) && e.location === '/');
+
+		expect(listTransactions(db, {})).toHaveLength(1);
+	});
+
+	it('create action fails with the entered values preserved', async () => {
+		const result = (await home.actions.create(
+			event('/?/create', {
+				date: '2026-07-10',
+				amount: 'abc',
+				direction: 'outflow',
+				bucket: 'wants'
+			})
+		)) as any;
+		expect(result.status).toBe(400);
+		expect(result.data.values.amount).toBe('abc');
 	});
 });

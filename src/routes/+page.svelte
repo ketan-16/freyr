@@ -1,11 +1,20 @@
 <script lang="ts">
+	import Delta from '$lib/components/Delta.svelte';
+	import EntryBar from '$lib/components/EntryBar.svelte';
+	import Meter from '$lib/components/Meter.svelte';
+	import Money from '$lib/components/Money.svelte';
 	import { monthLabel } from '$lib/dates';
 	import { formatMoney } from '$lib/money';
 	import { meter } from '$lib/progress';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
 	const s = $derived(data.summary);
+	const allocated = $derived(s.rows.reduce((total, row) => total + (row.allocated ?? 0), 0));
+	// One source for the headline and the table beneath it: the hero is the sum
+	// of the rows' remaining, never an independently computed income − spent.
+	const left = $derived(s.rows.reduce((total, row) => total + (row.remaining ?? 0), 0));
+	const daysLeft = $derived(data.daysInMonth - data.day);
 </script>
 
 <svelte:head>
@@ -14,30 +23,50 @@
 
 <div class="page-head">
 	<h1>{monthLabel(s.year, s.month)}</h1>
-	<span class="muted">This month so far</span>
+	<span class="muted">This month</span>
 </div>
 
-<div class="kpis">
-	<div class="kpi">
-		<div class="label">Income</div>
-		<div class="value pos">{formatMoney(s.income)}</div>
-	</div>
-	<div class="kpi">
-		<div class="label">Spent</div>
-		<div class="value">{formatMoney(s.rows.reduce((t, r) => t + r.actual, 0))}</div>
-	</div>
-	<div class="kpi">
-		<div class="label">Open lendings</div>
-		<div class="value">{formatMoney(data.lendingsOutstanding)}</div>
-	</div>
-</div>
+{#if data.awaitingIncome}
+	<p class="hero">
+		<span class="figure">{formatMoney(data.spent)} spent</span>
+		<Delta
+			current={data.spent}
+			previous={data.prior.spent}
+			lowerIsBetter
+			label="vs {data.prior.label}"
+		/>
+	</p>
+	<p class="hero-sub">Awaiting this month's income · {daysLeft} days remaining</p>
+	<p class="notice">
+		Allocations follow the income booked this month, and none is recorded yet. Buckets show what you
+		have spent; targets appear once income lands.
+	</p>
+{:else}
+	<p class="hero">
+		<span class="figure">{formatMoney(left)} left</span>
+		<!--
+		  The headline is what remains; the delta reports spending pace against
+		  the same span of days last month. Comparing "left" across two months
+		  would compare two different allocations and mean nothing.
+		-->
+		<Delta
+			current={data.spent}
+			previous={data.prior.spent}
+			lowerIsBetter
+			label="spent vs {data.prior.label}"
+		/>
+	</p>
+	<p class="hero-sub">
+		of {formatMoney(allocated)} allocated · {daysLeft} days remaining
+	</p>
+{/if}
 
-<h2>Budget</h2>
 {#if !s.period}
 	<p class="notice">
 		No budget period covers this month — set one in <a href="/settings/budget">Budget settings</a>.
 	</p>
 {/if}
+
 <div class="table-wrap">
 	<table>
 		<thead>
@@ -55,23 +84,62 @@
 				<tr>
 					<td data-label="Bucket">{row.label}</td>
 					<td data-label="Used">
-						{#if m}
-							<span class="meter {m.klass}"><span style="width:{m.width}%"></span></span>
-						{:else}
-							<span class="faint">—</span>
-						{/if}
+						<span class="meter-cell">
+							<Meter value={m} />
+							<span class="pct">{m ? `${m.pct}%` : ''}</span>
+						</span>
 					</td>
 					<td data-label="Allocated" class="num amount">
-						{row.allocated == null ? '—' : formatMoney(row.allocated)}
+						<Money value={row.allocated ?? 0} />
 					</td>
-					<td data-label="Actual" class="num amount">{formatMoney(row.actual)}</td>
+					<td data-label="Actual" class="num amount"><Money value={row.actual} /></td>
 					<td
 						data-label="Remaining"
-						class="num amount {row.remaining == null ? '' : row.remaining < 0 ? 'neg' : 'pos'}"
+						class="num amount {row.remaining == null ? '' : row.remaining < 0 ? 'neg' : ''}"
 					>
-						{row.remaining == null ? '—' : formatMoney(row.remaining)}
+						<Money value={row.remaining ?? 0} />
 					</td>
 				</tr>
+			{/each}
+		</tbody>
+	</table>
+</div>
+
+<h2>Add</h2>
+<EntryBar action="?/create" entry={data.entry} values={form?.values} />
+{#if form?.error}<p class="error">{form.error}</p>{/if}
+
+<h2>Recent</h2>
+<div class="table-wrap">
+	<table>
+		<thead>
+			<tr>
+				<th scope="col">Date</th>
+				<th scope="col" class="num">Amount</th>
+				<th scope="col">Type</th>
+				<th scope="col">Category</th>
+				<th scope="col">Note</th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each data.recent as t (t.id)}
+				<tr>
+					<td data-label="Date" class="num">{t.date}</td>
+					<td data-label="Amount" class="num amount">
+						<Money value={t.amountPaise} direction={t.direction} />
+					</td>
+					<td data-label="Type">
+						{#if t.direction === 'income'}
+							<span class="tag">income</span>
+						{:else}
+							<span class="tag">{t.bucket}</span>
+						{/if}
+					</td>
+					<td data-label={t.categoryName ? 'Category' : null}>{t.categoryName ?? ''}</td>
+					<td data-label={t.note ? 'Note' : null} class="muted">{t.note ?? ''}</td>
+				</tr>
+			{:else}
+				<tr><td class="empty" colspan="5">Nothing recorded yet.</td></tr>
 			{/each}
 		</tbody>
 	</table>
@@ -97,16 +165,10 @@
 						{g.goal.name}
 						{#if g.goal.kind === 'pot'}<span class="tag">pot</span>{/if}
 					</td>
-					<td data-label="Progress">
-						{#if m}
-							<span class="meter"><span style="width:{m.width}%"></span></span>
-						{:else}
-							<span class="faint">—</span>
-						{/if}
-					</td>
-					<td data-label="Saved" class="num amount">{formatMoney(g.contributed)}</td>
+					<td data-label="Progress"><Meter value={m} /></td>
+					<td data-label="Saved" class="num amount"><Money value={g.contributed} /></td>
 					<td data-label="Target" class="num amount">
-						{g.goal.targetPaise ? formatMoney(g.goal.targetPaise) : '—'}
+						<Money value={g.goal.targetPaise ?? 0} />
 					</td>
 					<td data-label="%" class="num">{m ? `${m.pct}%` : '—'}</td>
 				</tr>
@@ -116,3 +178,5 @@
 		</tbody>
 	</table>
 </div>
+
+<p class="hero-sub">Lendings outstanding {formatMoney(data.lendingsOutstanding)}</p>

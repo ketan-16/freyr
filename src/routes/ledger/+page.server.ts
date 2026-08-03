@@ -30,13 +30,19 @@ function backTo(url: URL): string {
 
 export const load: PageServerLoad = ({ locals, url }) => {
 	const filters = filtersFrom(url);
+	const today = todayISO();
 	return {
 		filters,
-		today: todayISO(),
+		today,
 		transactions: listTransactions(locals.db, filters),
-		categories: listCategories(locals.db),
-		goals: listGoals(locals.db).filter((g) => g.status === 'active'),
-		locations: listLocations(locals.db)
+		// Grouped under `entry` so the shape matches what <EntryBar> takes on
+		// home; the top-level `today` still feeds the year picker.
+		entry: {
+			today,
+			categories: listCategories(locals.db),
+			goals: listGoals(locals.db).filter((g) => g.status === 'active'),
+			locations: listLocations(locals.db)
+		}
 	};
 };
 
