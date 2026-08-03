@@ -7,3 +7,6 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# Agent scratch (git-ignored)
+.superpowers/
