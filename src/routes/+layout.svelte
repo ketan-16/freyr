@@ -8,18 +8,24 @@
 	let { children, data } = $props();
 
 	const nav = [
-		{ href: '/', label: 'Home', icon: 'home' },
+		{ href: '/', label: 'Home', icon: 'layout-dashboard' },
 		{ href: '/ledger', label: 'Ledger', icon: 'list' },
 		{ href: '/monthly', label: 'Monthly', icon: 'calendar' },
 		{ href: '/yearly', label: 'Yearly', icon: 'calendar-range' }
 	];
 
-	const settings = [{ href: '/settings/budget', label: 'Budget', icon: 'sliders' }];
+	const settings = [{ href: '/settings/budget', label: 'Budget', icon: 'sliders-horizontal' }];
 
 	function current(href: string): 'page' | undefined {
 		if (href === '/') return page.url.pathname === '/' ? 'page' : undefined;
 		return page.url.pathname.startsWith(href) ? 'page' : undefined;
 	}
+
+	// The mobile top bar carries the page title; on desktop the page h1 does
+	// that job and no top bar exists (DESIGN.md § topbar).
+	const title = $derived(
+		[...nav, ...settings].find((item) => current(item.href) === 'page')?.label ?? 'Freyr'
+	);
 </script>
 
 <svelte:head>
@@ -33,7 +39,7 @@
 
 	<div class="shell">
 		<header class="topbar">
-			<span class="wordmark"><FreyrMark size={18} />FREYR</span>
+			<span class="topbar-title">{title}</span>
 			<ThemeToggle theme={data.theme} class="" />
 		</header>
 

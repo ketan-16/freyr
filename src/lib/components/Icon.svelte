@@ -6,8 +6,13 @@
 -->
 <script lang="ts">
 	const ICONS: Record<string, string[]> = {
-		home: ['m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', 'M9 22V12h6v10'],
 		list: ['M3 12h.01', 'M3 18h.01', 'M3 6h.01', 'M8 12h13', 'M8 18h13', 'M8 6h13'],
+		'layout-dashboard': [
+			'M4 3h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z',
+			'M15 3h5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z',
+			'M15 12h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z',
+			'M4 16h5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z'
+		],
 		calendar: [
 			'M8 2v4',
 			'M16 2v4',
@@ -24,7 +29,7 @@
 			'M7 14h.01',
 			'M17 18h.01'
 		],
-		sliders: [
+		'sliders-horizontal': [
 			'M21 4h-7',
 			'M10 4H3',
 			'M21 12h-9',
