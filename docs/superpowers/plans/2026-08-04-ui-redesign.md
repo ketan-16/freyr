@@ -1142,23 +1142,33 @@ Append to `src/routes/pages.spec.ts`:
 
 ```ts
 describe('home command centre', () => {
+	// `/` always loads the real current month, so these seed relative to today
+	// rather than at fixed dates that would drift out of range.
+	const today = todayISO();
+	const year = Number(today.slice(0, 4));
+	const month = Number(today.slice(5, 7));
+
 	it('compares this month against the same days of last month', () => {
-		createPeriod(db, { effectiveFrom: '2025-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		const prev = prevMonth(year, month);
+		// The 1st of last month falls inside "through the same day" for any
+		// day-of-month today can be.
+		const prevFirst = `${prev.year}-${String(prev.month).padStart(2, '0')}-01`;
 		createTransaction(db, {
-			date: '2026-07-02',
+			date: prevFirst,
 			amountPaise: 800000,
 			direction: 'outflow',
 			bucket: 'needs'
 		});
 
 		const data = home.load(event('/')) as any;
-		expect(data.prior.spent).toBe(0);
-		expect(typeof data.prior.label).toBe('string');
+		expect(data.prior.spent).toBe(800000);
+		expect(data.prior.label).toBe(MONTH_NAMES[prev.month - 1]);
 	});
 
 	it('reports awaiting-income when no income is booked yet', () => {
+		createPeriod(db, { effectiveFrom: '2020-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
 		createTransaction(db, {
-			date: todayISO(),
+			date: today,
 			amountPaise: 350000,
 			direction: 'outflow',
 			bucket: 'needs'
@@ -1167,15 +1177,17 @@ describe('home command centre', () => {
 		const data = home.load(event('/')) as any;
 		expect(data.awaitingIncome).toBe(true);
 		expect(data.spent).toBe(350000);
-		// No income means no allocation — the rows must say "nothing here",
-		// not zero, or every bucket reads as overspent.
-		expect(data.summary.rows.every((r: any) => r.allocated === null)).toBe(true);
+		// Allocation is a share of booked income, so zero income allocates zero
+		// even with a period in force. `formatCell` renders that 0 as an em
+		// dash, which is exactly the "nothing here yet" the state needs — no
+		// special-casing in the markup.
+		expect(data.summary.rows.every((r: any) => r.allocated === 0)).toBe(true);
 	});
 
 	it('clears awaiting-income once income lands', () => {
-		createPeriod(db, { effectiveFrom: '2025-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		createPeriod(db, { effectiveFrom: '2020-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
 		createTransaction(db, {
-			date: todayISO(),
+			date: today,
 			amountPaise: 10000000,
 			direction: 'income',
 			incomeSource: 'job'
@@ -1231,7 +1243,7 @@ describe('home command centre', () => {
 });
 ```
 
-Add `todayISO` to the file's `$lib/dates` import (add the import if the file has none).
+Add `MONTH_NAMES`, `prevMonth` and `todayISO` to the file's `$lib/dates` import (add the import if the file has none).
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -1505,10 +1517,16 @@ Replace `src/routes/+page.svelte` entirely:
 {:else}
 	<p class="hero">
 		<span class="figure">{formatMoney(left)} left</span>
+		<!--
+		  The headline is what remains; the delta reports spending pace against
+		  the same span of days last month. Comparing "left" across two months
+		  would compare two different allocations and mean nothing.
+		-->
 		<Delta
-			current={left}
-			previous={data.prior.spent === 0 ? left : allocated - data.prior.spent}
-			label="vs {data.prior.label}"
+			current={data.spent}
+			previous={data.prior.spent}
+			lowerIsBetter
+			label="spent vs {data.prior.label}"
 		/>
 	</p>
 	<p class="hero-sub">
