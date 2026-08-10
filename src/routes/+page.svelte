@@ -15,6 +15,14 @@
 	// of the rows' remaining, never an independently computed income − spent.
 	const left = $derived(s.rows.reduce((total, row) => total + (row.remaining ?? 0), 0));
 	const daysLeft = $derived(data.daysInMonth - data.day);
+	/**
+	 * Whether there is anything for the headline to be "left" of: a period to
+	 * allocate by, and income for it to allocate. Missing either, every row's
+	 * allocated and remaining fold to 0 and the hero would read "₹0 left of ₹0
+	 * allocated" — a figure nobody recorded. Fall through to spend-so-far, which
+	 * is a fact either way.
+	 */
+	const hasAllocationBasis = $derived(s.period != null && !data.awaitingIncome);
 </script>
 
 <svelte:head>
@@ -26,22 +34,7 @@
 	<span class="muted">This month</span>
 </div>
 
-{#if data.awaitingIncome}
-	<p class="hero">
-		<span class="figure">{formatMoney(data.spent)} spent</span>
-		<Delta
-			current={data.spent}
-			previous={data.prior.spent}
-			lowerIsBetter
-			label="vs {data.prior.label}"
-		/>
-	</p>
-	<p class="hero-sub">Awaiting this month's income · {daysLeft} days remaining</p>
-	<p class="notice">
-		Allocations follow the income booked this month, and none is recorded yet. Buckets show what you
-		have spent; targets appear once income lands.
-	</p>
-{:else}
+{#if hasAllocationBasis}
 	<p class="hero">
 		<span class="figure">{formatMoney(left)} left</span>
 		<!--
@@ -59,6 +52,31 @@
 	<p class="hero-sub">
 		of {formatMoney(allocated)} allocated · {daysLeft} days remaining
 	</p>
+{:else}
+	<!--
+	  Nothing to be "left" of, so the headline states the one figure that was
+	  actually recorded. The sub-line says which basis is missing; when it is the
+	  budget period, the notice below carries the remedy, so it is not repeated
+	  here.
+	-->
+	<p class="hero">
+		<span class="figure">{formatMoney(data.spent)} spent</span>
+		<Delta
+			current={data.spent}
+			previous={data.prior.spent}
+			lowerIsBetter
+			label="vs {data.prior.label}"
+		/>
+	</p>
+	<p class="hero-sub">
+		{data.awaitingIncome ? "Awaiting this month's income" : 'Spent so far'} · {daysLeft} days remaining
+	</p>
+	{#if data.awaitingIncome}
+		<p class="notice">
+			Allocations follow the income booked this month, and none is recorded yet. Buckets show what
+			you have spent; targets appear once income lands.
+		</p>
+	{/if}
 {/if}
 
 {#if !s.period}

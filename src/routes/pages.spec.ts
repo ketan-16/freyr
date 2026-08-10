@@ -265,6 +265,25 @@ describe('home command centre', () => {
 		expect(data.awaitingIncome).toBe(false);
 	});
 
+	it('has no allocation basis when income is booked but no period covers the month', () => {
+		createTransaction(db, {
+			date: today,
+			amountPaise: 10000000,
+			direction: 'income',
+			incomeSource: 'job'
+		});
+
+		const data = home.load(event('/')) as any;
+		// Income was booked, so this is not the awaiting-income state — yet with
+		// no period there is nothing to allocate by, and every row's allocated
+		// and remaining are null. Folding those to 0 would make the hero claim
+		// "₹0 left of ₹0 allocated", a figure nobody recorded. The markup keys
+		// its branch on exactly these two facts.
+		expect(data.awaitingIncome).toBe(false);
+		expect(data.summary.period).toBeNull();
+		expect(data.summary.rows.every((r: any) => r.allocated === null)).toBe(true);
+	});
+
 	it('returns a bounded recent-activity list, newest first', () => {
 		for (let d = 1; d <= 10; d++) {
 			createTransaction(db, {
