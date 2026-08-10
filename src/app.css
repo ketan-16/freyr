@@ -509,8 +509,11 @@ h2 {
 	color: var(--ink-faint);
 }
 
+/* The label is prose a user reads, so it keeps a readable colour whatever the
+   delta's state — .delta.flat would otherwise hand it --ink-faint's 3:1. */
 .delta .muted {
 	margin-left: var(--space-1);
+	color: var(--ink-muted);
 }
 
 /* A meter and its figure share a line; the figure is the truth. */
@@ -594,8 +597,9 @@ td.amount {
 	min-width: 6.5rem;
 }
 
-/* Keep the meter column from absorbing the table's spare width. */
-td:has(> .meter) {
+/* Keep the meter column from absorbing the table's spare width. Not a child
+   combinator: the meter shares a .meter-cell with its percentage figure. */
+td:has(.meter) {
 	width: 8rem;
 }
 
