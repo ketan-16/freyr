@@ -5,6 +5,7 @@ import { sessionUser, userCount } from '$lib/server/auth';
 import { startBackupTimer } from '$lib/server/backup';
 import { isCrossSiteWrite } from '$lib/server/csrf';
 import { migrate, open } from '$lib/server/db';
+import { rebuildProjectedPeriods } from '$lib/server/promotions';
 import { error, redirect, type Handle } from '@sveltejs/kit';
 
 let db: DatabaseSync | undefined;
@@ -13,6 +14,14 @@ function getDb(): DatabaseSync {
 	if (!db) {
 		db = open(env.FREYR_DB || 'freyr.db');
 		migrate(db);
+		// budget_periods is a projection of budget_policy plus the promotion log,
+		// and until now nothing rebuilt it except a write to one of those. A
+		// database that has never had either — freshly created, or upgraded, since
+		// migration 0003 converts the old rows to 'manual' and projects nothing —
+		// therefore carried a policy the rest of the app could not see, and
+		// /monthly reported no period covering a month the policy did describe.
+		// Idempotent: it rewrites only the rows it owns and never a manual one.
+		rebuildProjectedPeriods(db);
 		startBackupTimer(db, env.FREYR_BACKUPS || 'backups');
 	}
 	return db;

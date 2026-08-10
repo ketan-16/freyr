@@ -65,8 +65,29 @@ describe('parsePercentBP', () => {
 		expect(parsePercentBP(input)).toBe(expected);
 	});
 
-	it.each([[''], ['abc'], ['1.234'], ['-5']])('rejects %s', (input) => {
-		expect(() => parsePercentBP(input)).toThrow();
+	// Eleven inputs on /settings/budget parse through here, so a rejection has to
+	// read as a sentence about a percentage — not as a money-module fragment
+	// saying "amount" on a field that asks for a percent.
+	it.each([
+		['', 'Enter a percentage like 27.20.'],
+		['abc', 'Enter a percentage like 27.20 (got "abc").'],
+		['1.234', 'Enter a percentage like 27.20 (got "1.234").'],
+		['1..2', 'Enter a percentage like 27.20 (got "1..2").'],
+		['-5', 'A percentage cannot be negative (got "-5").']
+	])('rejects %s with a sentence', (input, message) => {
+		expect(() => parsePercentBP(input)).toThrow(message);
+	});
+
+	it('keeps the money-module wording as the cause, not as the message', () => {
+		expect.assertions(2);
+		try {
+			parsePercentBP('1.234');
+		} catch (err) {
+			expect((err as Error).message).not.toMatch(/amount/);
+			expect(((err as Error).cause as Error).message).toBe(
+				'amount "1.234" has more than 2 decimal places'
+			);
+		}
 	});
 });
 

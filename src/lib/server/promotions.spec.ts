@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { activeFor, listPeriods } from './budgets';
+import { activeFor, createPeriod, listPeriods } from './budgets';
 import {
 	createPromotion,
 	deletePromotion,
@@ -182,6 +182,40 @@ describe('rebuildProjectedPeriods', () => {
 		expect(base).toHaveLength(1);
 		expect(base[0].effectiveFrom).toBe('2021-09-01');
 		expect(base[0].needsBP).toBe(5000);
+	});
+
+	/*
+	 * The two states hooks.server.ts calls this for, straight after migrate().
+	 * Nothing else projects, so before the boot rebuild existed both of these
+	 * databases carried a policy that no page could see: /monthly reported no
+	 * period covering a month the policy did describe.
+	 */
+	it('gives a migrated but never-written database the period its policy describes', () => {
+		expect(listPeriods(db)).toEqual([]);
+
+		rebuildProjectedPeriods(db);
+
+		expect(listPeriods(db).map((p) => `${p.effectiveFrom}:${p.source}`)).toEqual([
+			'2021-09-01:base'
+		]);
+		expect(activeFor(db, '2026-08-01')?.needsBP).toBe(5000);
+	});
+
+	it('adds the base row to an upgraded database without disturbing its own rows', () => {
+		// What migration 0003 leaves behind: the pre-existing periods converted to
+		// 'manual', and no projection at all.
+		createPeriod(db, { effectiveFrom: '2024-08-01', needsBP: 3086, wantsBP: 3000, investBP: 3914 });
+
+		rebuildProjectedPeriods(db);
+
+		expect(listPeriods(db).map((p) => `${p.effectiveFrom}:${p.source}`)).toEqual([
+			'2024-08-01:manual',
+			'2021-09-01:base'
+		]);
+		// The manual row still wins its own span; the base row only covers what
+		// nothing covered before.
+		expect(activeFor(db, '2025-01-01')?.needsBP).toBe(3086);
+		expect(activeFor(db, '2022-01-01')?.needsBP).toBe(5000);
 	});
 
 	it('rolls back a rebuild that fails part-way, leaving no partial projection', () => {

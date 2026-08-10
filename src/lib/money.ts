@@ -77,10 +77,28 @@ export function mulBP(p: Paise, bp: number): Paise {
 	return quotient;
 }
 
-/** Parses a non-negative percentage like "27.20" into basis points (2720). */
+/**
+ * Parses a non-negative percentage like "27.20" into basis points (2720).
+ *
+ * Rejections are phrased as percentages, not as money. `parseMoney` does the
+ * work — the two share a scale, two decimals to an integer ×100 — but its
+ * wording says "amount", which is wrong on a field asking for a percent and is
+ * a lowercase fragment where every other message a form shows is a sentence.
+ * Its text is demoted to the `cause`, the way the SQLite wrappers demote
+ * constraint text, so nothing is lost for a developer reading a stack trace.
+ */
 export function parsePercentBP(s: string): number {
-	const bp = parseMoney(s); // same scale: two decimals → integer ×100
-	if (bp < 0) throw new Error(`percentage "${s}" must not be negative`);
+	const text = s.trim();
+	if (text === '') throw new Error('Enter a percentage like 27.20.');
+
+	let bp: number;
+	try {
+		bp = parseMoney(text);
+	} catch (err) {
+		throw new Error(`Enter a percentage like 27.20 (got "${text}").`, { cause: err });
+	}
+
+	if (bp < 0) throw new Error(`A percentage cannot be negative (got "${text}").`);
 	return bp;
 }
 
