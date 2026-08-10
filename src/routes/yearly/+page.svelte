@@ -88,16 +88,17 @@
 {:else if data.allocation.coverage === 'partial'}
 	<!--
 	  Allocated counts covered months only; Actual counts every month. Remaining
-	  is therefore a partial-year plan minus a whole-year spend, and reads lower
-	  than what was really left — far enough, on a big uncovered month, to paint
-	  an overspend that never happened. The arithmetic is not rescaled (that
-	  would invent a plan for months that never had one), so the notice has to
-	  say plainly which columns are affected and how.
+	  is therefore a partial-year plan minus a whole-year spend, so it never
+	  reads high — it is exact when the uncovered months spent nothing in a
+	  bucket, and on a big uncovered month low enough to paint an overspend that
+	  never happened. The arithmetic is not rescaled (that would invent a plan
+	  for months that never had one), so the notice has to say plainly which
+	  columns are affected and how.
 	-->
 	<p class="notice">
 		No budget period covers {uncovered}. Spending in
 		{data.allocation.uncoveredMonths.length === 1 ? 'that month' : 'those months'} still counts toward
-		Actual, but Allocated covers only the rest of the year — so Remaining is understated and can show
+		Actual, but Allocated covers only the rest of the year — so Remaining can be understated and show
 		an overspend that never happened, and Allocated share divides a partial plan by the whole year's income.
 		Backdate a period in <a href="/settings/budget">Budget settings</a> to cover the year.
 	</p>
