@@ -18,20 +18,20 @@
 	const prevHref = $derived(`/monthly?year=${prev.year}&month=${prev.month}`);
 	const nextHref = $derived(`/monthly?year=${next.year}&month=${next.month}`);
 
-	// DESIGN.md asks for arrow-key stepping. Focus does not survive a
-	// navigation, so a group-scoped handler would fire only once; this listens
-	// at page level and stands down whenever a form control has focus.
+	/**
+	 * Arrow-key stepping, scoped to the group (DESIGN.md § month-stepper). It
+	 * catches keydown bubbling from whichever arrow has focus; `keepFocus` keeps
+	 * that focus across the navigation, so repeated presses keep stepping. A
+	 * window listener would instead hijack every arrow press on the page —
+	 * horizontal scroll at 200% zoom, the table's own scroller, the rail.
+	 */
 	function onkeydown(e: KeyboardEvent) {
 		if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-		const el = e.target as HTMLElement | null;
-		if (el && (el.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)))
-			return;
-		if (e.key === 'ArrowLeft') goto(prevHref);
-		else if (e.key === 'ArrowRight') goto(nextHref);
+		if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+		e.preventDefault();
+		goto(e.key === 'ArrowLeft' ? prevHref : nextHref, { keepFocus: true });
 	}
 </script>
-
-<svelte:window {onkeydown} />
 
 <svelte:head>
 	<title>Monthly — Freyr</title>
@@ -42,7 +42,10 @@
 </div>
 
 <div class="toolbar">
-	<div class="stepper">
+	<!-- The keys are pressed on the focused arrow link, which is interactive; the
+	     group only listens as they bubble, so there is nothing here to focus. -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<div class="stepper" role="group" aria-label="Month" {onkeydown}>
 		<a href={prevHref} aria-label="Previous month, {monthLabel(prev.year, prev.month)}">
 			<Icon name="left" />
 		</a>
