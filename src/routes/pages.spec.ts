@@ -233,6 +233,130 @@ describe('yearly page', () => {
 	});
 });
 
+describe('yearly rollup', () => {
+	it('returns per-bucket allocation alongside the month rows', () => {
+		createPeriod(db, { effectiveFrom: '2025-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		createTransaction(db, {
+			date: '2026-03-01',
+			amountPaise: 10000000,
+			direction: 'income',
+			incomeSource: 'job'
+		});
+		createTransaction(db, {
+			date: '2026-03-05',
+			amountPaise: 4000000,
+			direction: 'outflow',
+			bucket: 'needs'
+		});
+
+		const data = yearly.load(event('/yearly?year=2026')) as any;
+		expect(data.allocation.rows).toHaveLength(3);
+		const needs = data.allocation.rows.find((r: any) => r.bucket === 'needs');
+		expect(needs.allocated).toBe(5000000);
+		expect(needs.actual).toBe(4000000);
+		// Variance is actual − allocated, so spending ₹10,000 under plan is
+		// negative. The page renders it as a delta so the sign is never implied
+		// by colour alone.
+		expect(needs.variance).toBe(-1000000);
+		// allocated ÷ income: the blended allocation share, not the share spent.
+		expect(needs.effectiveBP).toBe(5000);
+	});
+
+	it('reports income the buckets never absorbed as unallocated', () => {
+		createPeriod(db, { effectiveFrom: '2025-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		createTransaction(db, {
+			date: '2026-03-01',
+			amountPaise: 10000000,
+			direction: 'income',
+			incomeSource: 'job'
+		});
+		createTransaction(db, {
+			date: '2026-03-05',
+			amountPaise: 4000000,
+			direction: 'outflow',
+			bucket: 'needs'
+		});
+
+		const data = yearly.load(event('/yearly?year=2026')) as any;
+		expect(data.allocation.income).toBe(10000000);
+		expect(data.allocation.unallocated).toBe(6000000);
+		// The page describes this figure instead of printing it, on the grounds
+		// that it is the Net headline — income minus the buckets' actuals. Guard
+		// the identity so that claim cannot quietly become false.
+		const spent = data.allocation.rows.reduce((t: number, r: any) => t + r.actual, 0);
+		expect(data.allocation.unallocated).toBe(data.summary.job + data.summary.sideHustle - spent);
+	});
+
+	// A year the ledger has no rows for is still a year the picker must be able
+	// to sit on — otherwise the select renders with nothing selected.
+	it('offers the requested year in the picker even with no rows in it', () => {
+		seedJuly();
+		const data = yearly.load(event('/yearly?year=2019')) as any;
+		expect(data.year).toBe(2019);
+		expect(data.years).toEqual([2019, 2026]);
+	});
+});
+
+describe('yearly comparison', () => {
+	it('compares a completed year whole against whole', () => {
+		// Last year is finished whatever today is, so this exercises the
+		// unbounded branch without depending on the current date.
+		const year = Number(todayISO().slice(0, 4)) - 1;
+		const mm = (m: number) => String(m).padStart(2, '0');
+		// The last day of the year before it: a same-span-of-days bound would
+		// clip this on every day but New Year's Eve, so counting it shows the
+		// completed year was compared whole.
+		createTransaction(db, {
+			date: `${year - 1}-12-31`,
+			amountPaise: 200000,
+			direction: 'outflow',
+			bucket: 'wants'
+		});
+		createTransaction(db, {
+			date: `${year}-${mm(6)}-01`,
+			amountPaise: 500000,
+			direction: 'outflow',
+			bucket: 'wants'
+		});
+
+		const data = yearly.load(event(`/yearly?year=${year}`)) as any;
+		expect(data.prior.label).toBe(String(year - 1));
+		expect(data.prior.spent).toBe(200000);
+	});
+
+	// The current-year branch depends on today's date, so it seeds relative to
+	// today rather than at fixed dates that would drift out of range.
+	it('bounds the prior year to the same span of days when the year is in progress', () => {
+		const today = todayISO();
+		const year = Number(today.slice(0, 4));
+		const month = Number(today.slice(5, 7));
+		const day = Number(today.slice(8, 10));
+		// The bound is exclusive, so the day it names is the first day left out
+		// and the day before it is the last one counted — whatever today is.
+		const firstExcluded = dayBoundIn(year - 1, month, day);
+		const lastCounted = `${year - 1}-${String(month).padStart(2, '0')}-${String(
+			Math.min(day, daysInMonth(year - 1, month))
+		).padStart(2, '0')}`;
+
+		createTransaction(db, {
+			date: lastCounted,
+			amountPaise: 500000,
+			direction: 'outflow',
+			bucket: 'needs'
+		});
+		createTransaction(db, {
+			date: firstExcluded,
+			amountPaise: 900000,
+			direction: 'outflow',
+			bucket: 'wants'
+		});
+
+		const data = yearly.load(event(`/yearly?year=${year}`)) as any;
+		expect(data.prior.label).toBe(String(year - 1));
+		expect(data.prior.spent).toBe(500000);
+	});
+});
+
 describe('budget settings page', () => {
 	it('creates a period from percent inputs', async () => {
 		await expect(
