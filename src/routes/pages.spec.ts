@@ -254,10 +254,9 @@ describe('yearly rollup', () => {
 		const needs = data.allocation.rows.find((r: any) => r.bucket === 'needs');
 		expect(needs.allocated).toBe(5000000);
 		expect(needs.actual).toBe(4000000);
-		// Variance is actual − allocated, so spending ₹10,000 under plan is
-		// negative. The page renders it as a delta so the sign is never implied
-		// by colour alone.
-		expect(needs.variance).toBe(-1000000);
+		// Remaining is allocated − actual, the same figure and sign the monthly
+		// page shows, so ₹10,000 under plan is positive on both.
+		expect(needs.remaining).toBe(1000000);
 		// allocated ÷ income: the blended allocation share, not the share spent.
 		expect(needs.effectiveBP).toBe(5000);
 	});
@@ -269,6 +268,15 @@ describe('yearly rollup', () => {
 			amountPaise: 10000000,
 			direction: 'income',
 			incomeSource: 'job'
+		});
+		// An `other` inflow, which neither income definition counts. Without one
+		// the two independently-written SQL definitions agree trivially and the
+		// identity below cannot fail; with one, a change to either breaks it.
+		createTransaction(db, {
+			date: '2026-04-02',
+			amountPaise: 2500000,
+			direction: 'income',
+			incomeSource: 'other'
 		});
 		createTransaction(db, {
 			date: '2026-03-05',
@@ -294,6 +302,84 @@ describe('yearly rollup', () => {
 		const data = yearly.load(event('/yearly?year=2019')) as any;
 		expect(data.year).toBe(2019);
 		expect(data.years).toEqual([2019, 2026]);
+	});
+});
+
+describe('yearly budget coverage', () => {
+	// Reachable in practice: years imported from before the earliest budget
+	// period. Previously every bucket showed an allocation of ₹0 and a 0.00%
+	// share, so the year's whole spend read as a blown budget nobody had set.
+	it('reports no plan for a year no budget period covers', () => {
+		createPeriod(db, { effectiveFrom: '2026-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		createTransaction(db, {
+			date: '2019-04-02',
+			amountPaise: 900000,
+			direction: 'income',
+			incomeSource: 'job'
+		});
+		createTransaction(db, {
+			date: '2019-04-09',
+			amountPaise: 300000,
+			direction: 'outflow',
+			bucket: 'needs'
+		});
+
+		const data = yearly.load(event('/yearly?year=2019')) as any;
+		expect(data.allocation.coverage).toBe('none');
+		expect(data.allocation.rows.every((r: any) => r.allocated === null)).toBe(true);
+		expect(data.allocation.rows.every((r: any) => r.remaining === null)).toBe(true);
+		// Income was booked, so the old fold divided by it and produced a real
+		// 0.00% share rather than an absent one.
+		expect(data.allocation.rows.every((r: any) => r.effectiveBP === null)).toBe(true);
+	});
+
+	it('names the uncovered months when a period starts mid-year', () => {
+		createPeriod(db, { effectiveFrom: '2026-06-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		createTransaction(db, {
+			date: '2026-02-01',
+			amountPaise: 900000,
+			direction: 'income',
+			incomeSource: 'job'
+		});
+		createTransaction(db, {
+			date: '2026-07-01',
+			amountPaise: 900000,
+			direction: 'income',
+			incomeSource: 'job'
+		});
+
+		const data = yearly.load(event('/yearly?year=2026')) as any;
+		expect(data.allocation.coverage).toBe('partial');
+		expect(data.allocation.uncoveredMonths).toEqual([2]);
+		// July's half alone — February is left out rather than allocated at a
+		// rate that was not in force.
+		const needs = data.allocation.rows.find((r: any) => r.bucket === 'needs');
+		expect(needs.allocated).toBe(450000);
+	});
+
+	it('reports awaiting-income for a year with spending but none booked', () => {
+		createPeriod(db, { effectiveFrom: '2025-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		createTransaction(db, {
+			date: '2026-02-11',
+			amountPaise: 450000,
+			direction: 'outflow',
+			bucket: 'wants'
+		});
+
+		const data = yearly.load(event('/yearly?year=2026')) as any;
+		expect(data.awaitingIncome).toBe(true);
+		// A period is in force, so it allocates a real share of zero income. The
+		// domain reports the resulting −actual faithfully; the page suppresses it,
+		// exactly as home and monthly do.
+		const wants = data.allocation.rows.find((r: any) => r.bucket === 'wants');
+		expect(wants.remaining).toBe(-450000);
+	});
+
+	it('does not claim a year with no transactions at all is uncovered', () => {
+		createPeriod(db, { effectiveFrom: '2026-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		const data = yearly.load(event('/yearly?year=2019')) as any;
+		expect(data.allocation.coverage).toBe('empty');
+		expect(data.awaitingIncome).toBe(false);
 	});
 });
 

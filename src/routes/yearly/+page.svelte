@@ -11,6 +11,10 @@
 	const income = $derived(data.summary.job + data.summary.sideHustle);
 	const spent = $derived(data.allocation.rows.reduce((total, row) => total + row.actual, 0));
 	const net = $derived(income - spent);
+
+	const uncovered = $derived(
+		data.allocation.uncoveredMonths.map((m) => MONTH_NAMES[m - 1]).join(', ')
+	);
 </script>
 
 <svelte:head>
@@ -58,6 +62,33 @@
 	</div>
 </div>
 
+<!--
+  One notice at most, in order of how much it explains. "No period at all"
+  already accounts for every dash in the table, so it supersedes the other two;
+  with no income booked the allocation is zero whatever the coverage, so that
+  supersedes the partial-coverage note.
+-->
+{#if data.allocation.coverage === 'none'}
+	<p class="notice">
+		No budget period covers {data.year} — set one in
+		<a href="/settings/budget">Budget settings</a>. The buckets below show what was spent; there is
+		no plan to measure it against.
+	</p>
+{:else if data.awaitingIncome}
+	<p class="notice">
+		No income is booked in {data.year}, so there was nothing to allocate. The buckets below show
+		what was spent; targets appear once income lands.
+	</p>
+{:else if data.allocation.coverage === 'partial'}
+	<p class="notice">
+		No budget period covers {uncovered}. Income and spending in
+		{data.allocation.uncoveredMonths.length === 1 ? 'that month are' : 'those months are'} still counted
+		below, but nothing is allocated against
+		{data.allocation.uncoveredMonths.length === 1 ? 'it' : 'them'}, so allocated and remaining cover
+		only the rest of the year.
+	</p>
+{/if}
+
 <h2>Allocation vs actual</h2>
 <!--
   The caption sits above the columns it explains rather than below them, so the
@@ -76,7 +107,7 @@
 				<th scope="col">Bucket</th>
 				<th scope="col" class="num">Allocated</th>
 				<th scope="col" class="num">Actual</th>
-				<th scope="col" class="num">Variance</th>
+				<th scope="col" class="num">Remaining</th>
 				<th scope="col" class="num">Allocated share</th>
 			</tr>
 		</thead>
@@ -84,19 +115,32 @@
 			{#each data.allocation.rows as row (row.bucket)}
 				<tr>
 					<td data-label="Bucket">{row.label}</td>
-					<td data-label="Allocated" class="num amount"><Money value={row.allocated} /></td>
+					<td data-label="Allocated" class="num amount">
+						<Money value={row.allocated ?? 0} />
+					</td>
 					<td data-label="Actual" class="num amount"><Money value={row.actual} /></td>
 					<!--
-					  Variance is actual − allocated, so an overspend is a *positive*
-					  number and rendering it as bare money would leave red as the only
-					  signal. A delta says it three ways at once — ▲ +₹x in --loss for
-					  over plan, ▼ −₹x in --gain for under. The arrow reports the
-					  direction of the number and the colour reports whether that is
-					  good news; they are independent here (see $lib/format), so a red ▲
-					  is correct and not a bug to "fix".
+					  Rendered exactly as the monthly view renders the same fact — same
+					  figure, same sign, same component — so a ₹10,000 overspend cannot
+					  read one way here and the other there. `formatCell` emits the minus,
+					  so the colour reinforces a sign rather than carrying the meaning.
+					  Before income lands, and with no period covering the year, there is
+					  no allocation to have anything left of: that is nothing yet, not an
+					  overspend.
 					-->
-					<td data-label="Variance" class="num amount">
-						<Delta current={row.actual} previous={row.allocated} lowerIsBetter />
+					<td
+						data-label="Remaining"
+						class="num amount {data.awaitingIncome || row.remaining == null
+							? ''
+							: row.remaining < 0
+								? 'neg'
+								: ''}"
+					>
+						{#if data.awaitingIncome}
+							<span class="faint">—</span>
+						{:else}
+							<Money value={row.remaining ?? 0} />
+						{/if}
 					</td>
 					<td data-label="Allocated share" class="num muted">
 						{row.effectiveBP == null ? '—' : formatBP(row.effectiveBP)}

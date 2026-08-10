@@ -139,24 +139,47 @@ export function monthSummary(db: DatabaseSync, year: number, month: number): Mon
 export interface YearlyBucketRow {
 	bucket: 'needs' | 'wants' | 'investments';
 	label: string;
-	allocated: Paise;
+	/**
+	 * The year's plan for this bucket, summed month by month. null when no period
+	 * was in force for any month of the year: no plan is a different fact from a
+	 * plan of zero, and only one of them is true.
+	 */
+	allocated: Paise | null;
 	actual: Paise;
-	/** actual − allocated: positive means overspent against plan. */
-	variance: Paise;
+	/**
+	 * allocated − actual — the same figure, name and sign `monthSummary` reports,
+	 * so an overspend reads identically on the monthly and yearly pages. null
+	 * when there is no plan to have anything left of.
+	 */
+	remaining: Paise | null;
 	/**
 	 * allocated ÷ income, in basis points — the blended weight the year actually
-	 * ran at across however many splits were in force. null when income was zero,
-	 * because there is no share of nothing: 0 would read as "took no share" and a
-	 * bare divide would give NaN.
+	 * ran at across however many splits were in force. null when income was zero
+	 * or no period covered the year, because there is no share of nothing: 0
+	 * would read as "took no share" and a bare divide would give NaN.
 	 */
 	effectiveBP: number | null;
 }
+
+/**
+ * How much of a year's recorded activity a budget period was in force for.
+ * `empty` is a year with no transactions at all — nothing to cover, and nothing
+ * to warn anybody about.
+ */
+export type YearCoverage = 'empty' | 'none' | 'partial' | 'full';
 
 export interface YearlyAllocation {
 	income: Paise;
 	rows: YearlyBucketRow[];
 	/** Income that never reached a bucket — the gap plan-vs-actual hides. */
 	unallocated: Paise;
+	coverage: YearCoverage;
+	/**
+	 * Months that have data but no period in force. Their income and spend are
+	 * still counted; nothing is allocated against them, so a page has to say so
+	 * rather than let the missing plan read as an overspend.
+	 */
+	uncoveredMonths: number[];
 }
 
 /**
@@ -168,6 +191,11 @@ export interface YearlyAllocation {
  *
  * Pure over already-fetched rows, so the page costs one grouped query plus one
  * period fetch however many months have data.
+ *
+ * Months no period covers are reported rather than silently skipped. Folding
+ * them in as an allocation of zero would make the year's entire spend read as
+ * an overspend against a budget nobody ever set — which is exactly what a year
+ * imported from before the earliest period looks like.
  */
 export function yearlyAllocation(
 	periods: Period[],
@@ -176,6 +204,8 @@ export function yearlyAllocation(
 ): YearlyAllocation {
 	const mm = (m: number) => String(m).padStart(2, '0');
 	let income = 0;
+	let covered = 0;
+	const uncoveredMonths: number[] = [];
 	const allocated = { needs: 0, wants: 0, invest: 0 };
 	const actual = { needs: 0, wants: 0, invest: 0 };
 
@@ -186,13 +216,21 @@ export function yearlyAllocation(
 		actual.invest += month.invest;
 
 		const period = periodFor(periods, `${year}-${mm(month.month)}-01`);
-		if (!period) continue;
+		if (!period) {
+			uncoveredMonths.push(month.month);
+			continue;
+		}
+		covered++;
 		const share = allocate(month.income, period);
 		allocated.needs += share.needs;
 		allocated.wants += share.wants;
 		allocated.invest += share.invest;
 	}
 
+	// Nothing covered means there is no plan, so every allocation-derived figure
+	// is absent rather than zero. Partial coverage keeps the real partial plan —
+	// no allocation is invented for the months that had none.
+	const hasPlan = covered > 0;
 	const effective = (a: Paise) => (income === 0 ? null : Math.round((a * 10000) / income));
 	const rows: YearlyBucketRow[] = (
 		[
@@ -203,15 +241,24 @@ export function yearlyAllocation(
 	).map(([bucket, label, alloc, act]) => ({
 		bucket,
 		label,
-		allocated: alloc,
+		allocated: hasPlan ? alloc : null,
 		actual: act,
-		variance: act - alloc,
-		effectiveBP: effective(alloc)
+		remaining: hasPlan ? alloc - act : null,
+		effectiveBP: hasPlan ? effective(alloc) : null
 	}));
 
 	return {
 		income,
 		rows,
-		unallocated: income - (actual.needs + actual.wants + actual.invest)
+		unallocated: income - (actual.needs + actual.wants + actual.invest),
+		coverage:
+			months.length === 0
+				? 'empty'
+				: uncoveredMonths.length === 0
+					? 'full'
+					: covered === 0
+						? 'none'
+						: 'partial',
+		uncoveredMonths
 	};
 }

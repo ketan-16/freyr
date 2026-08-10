@@ -147,13 +147,28 @@ describe('yearlyAllocation', () => {
 		expect(needs.effectiveBP).toBe(4000); // exactly halfway on equal income
 	});
 
-	it('reports variance as actual minus allocated', () => {
+	// Same name, same sign and same component as the monthly view's column, so a
+	// ₹30,000 overspend cannot read one way on /monthly and the other on /yearly.
+	it('reports remaining as allocated minus actual, like the monthly view', () => {
 		createPeriod(db, { effectiveFrom: '2025-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
 		const needs = yearlyAllocation(listPeriods(db), months, 2025).rows.find(
 			(r) => r.bucket === 'needs'
 		)!;
+		expect(needs.allocated).toBe(fromRupees(100000));
 		expect(needs.actual).toBe(fromRupees(50000));
-		expect(needs.variance).toBe(needs.actual - needs.allocated);
+		// Underspending leaves a positive remainder.
+		expect(needs.remaining).toBe(fromRupees(50000));
+	});
+
+	it('reports an overspend as a negative remaining', () => {
+		createPeriod(db, { effectiveFrom: '2025-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		const needs = yearlyAllocation(
+			listPeriods(db),
+			[{ month: 3, income: fromRupees(10000), needs: fromRupees(8000), wants: 0, invest: 0 }],
+			2025
+		).rows.find((r) => r.bucket === 'needs')!;
+		expect(needs.allocated).toBe(fromRupees(5000));
+		expect(needs.remaining).toBe(-fromRupees(3000));
 	});
 
 	it('surfaces income that never reached a bucket', () => {
@@ -164,11 +179,44 @@ describe('yearlyAllocation', () => {
 		expect(y.unallocated).toBe(fromRupees(150000));
 	});
 
-	it('allocates nothing for months before any period exists', () => {
+	it('reports no plan at all for a year no period covers', () => {
 		createPeriod(db, { effectiveFrom: '2026-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
 		const y = yearlyAllocation(listPeriods(db), months, 2025);
-		expect(y.rows.every((r) => r.allocated === 0)).toBe(true);
-		expect(y.rows.every((r) => r.effectiveBP === 0)).toBe(true);
+		expect(y.coverage).toBe('none');
+		expect(y.uncoveredMonths).toEqual([1, 9]);
+		// null, never 0. A plan of zero makes the year's whole spend read as an
+		// overspend against a budget nobody set, and a 0.00% share read as a real
+		// share rather than an absent one.
+		expect(y.rows.map((r) => r.allocated)).toEqual([null, null, null]);
+		expect(y.rows.map((r) => r.remaining)).toEqual([null, null, null]);
+		expect(y.rows.map((r) => r.effectiveBP)).toEqual([null, null, null]);
+		// The spend itself is still counted — it happened.
+		expect(y.rows.find((r) => r.bucket === 'needs')!.actual).toBe(fromRupees(50000));
+	});
+
+	it('keeps the real partial plan and names the uncovered months', () => {
+		createPeriod(db, { effectiveFrom: '2025-05-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		const y = yearlyAllocation(listPeriods(db), months, 2025);
+		expect(y.coverage).toBe('partial');
+		expect(y.uncoveredMonths).toEqual([1]);
+		// September's 50% alone. January had no period, and none is invented for it.
+		expect(y.rows.find((r) => r.bucket === 'needs')!.allocated).toBe(fromRupees(50000));
+	});
+
+	it('reports full coverage when a period covers every month with data', () => {
+		createPeriod(db, { effectiveFrom: '2025-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		const y = yearlyAllocation(listPeriods(db), months, 2025);
+		expect(y.coverage).toBe('full');
+		expect(y.uncoveredMonths).toEqual([]);
+	});
+
+	it('treats a year with no transactions as empty, not as uncovered', () => {
+		createPeriod(db, { effectiveFrom: '2025-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		const y = yearlyAllocation(listPeriods(db), [], 2025);
+		// Nothing happened, so there is nothing to warn about — an "uncovered"
+		// year would put a notice on every year the ledger has never touched.
+		expect(y.coverage).toBe('empty');
+		expect(y.rows.map((r) => r.allocated)).toEqual([null, null, null]);
 	});
 
 	it('reports no effective rate at all when the year had no income', () => {

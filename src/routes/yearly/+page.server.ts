@@ -13,6 +13,8 @@ export const load: PageServerLoad = ({ locals, url }) => {
 	// One grouped query for every month that has data, replacing the
 	// twelve-round-trip loop this page used to run.
 	const months = monthlyActualsForYear(locals.db, year);
+	// Pure over the rows already fetched: no query per month, no query per period.
+	const allocation = yearlyAllocation(listPeriods(locals.db), months, year);
 
 	return {
 		year,
@@ -21,9 +23,13 @@ export const load: PageServerLoad = ({ locals, url }) => {
 		years: allYears.includes(year) ? allYears : [...allYears, year].sort((a, b) => a - b),
 		summary: yearlySummary(locals.db, year),
 		months,
-		// Pure over the rows already fetched: no query per month, no query per
-		// period.
-		allocation: yearlyAllocation(listPeriods(locals.db), months, year),
+		allocation,
+		// Allocation is a share of the income booked in the year, so with none
+		// booked every bucket allocates 0 and remaining folds to 0 − actual. Home
+		// and monthly read that as awaiting income rather than three blown
+		// budgets; yearly must not contradict them. A year with nothing recorded
+		// at all is not awaiting anything.
+		awaitingIncome: months.length > 0 && allocation.income === 0,
 		// A year in progress compares against the same span of days; a completed
 		// year compares whole against whole.
 		prior: priorYear(locals.db, year, today)
