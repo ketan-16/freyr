@@ -70,7 +70,9 @@ Request → `hooks.server.ts` (db + session + guard) → `load`/action in `+page
 (thin) → `src/lib/server/*` domain function (validation + hand-written SQL) → rendered
 page. Forms POST to named actions and redirect (303) preserving filters; `use:enhance`
 makes that feel instant and refocuses the amount field for keyboard-first entry. Validation
-errors return `fail(400, { error, values })` so the form re-renders with what was typed.
+errors return `fail(400, { error, values })` so the form re-renders with what was typed. The
+entry bar renders that message itself, as a `role="alert"` the amount field points at with
+`aria-describedby` — `use:enhance` never reloads, so an unassociated message would be silent.
 
 ## Excel import design
 
@@ -103,6 +105,10 @@ from a raw dump of the real workbook:
 - **Money is integer paise; percentages are basis points.** Enforced in domain code and by
   SQLite CHECK constraints; division goes through explicit rounding (`mulBP`, half away
   from zero).
+- **Only the income sources the rollups count are offered.** `monthlyActuals` and the
+  yearly split aggregate `job` and `side_hustle`, so the entry bar offers those two alone;
+  income booked as `other` would be invisible to every allocation and total. The enum keeps
+  `other` for imported rows (lending repayments received).
 - **Imported history double-counts goal contributions inside monthly invest actuals** —
   the workbook itself couldn't be reconciled itemized; flagged in the import report and
   accepted for pre-app history.
