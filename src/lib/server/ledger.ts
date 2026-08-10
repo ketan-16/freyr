@@ -205,6 +205,35 @@ export function monthlyActuals(
 	return row;
 }
 
+export interface MonthActuals extends MonthlyActuals {
+	month: number;
+}
+
+/**
+ * Every month of a year that has data, in one pass. The yearly view needs all
+ * twelve; querying per month made that page issue a query per month.
+ *
+ * The per-month figures are identical to monthlyActuals — same CASE arms, same
+ * half-open range, same rule that only job and side-hustle income counts.
+ * Months with no rows are absent rather than zero-filled, exactly as
+ * monthsWithData reports them.
+ */
+export function monthlyActualsForYear(db: DatabaseSync, year: number): MonthActuals[] {
+	const [start, end] = dateRange(year);
+	return db
+		.prepare(
+			`SELECT CAST(substr(date, 6, 2) AS INTEGER) AS month,
+			   COALESCE(SUM(CASE WHEN direction = 'income' AND income_source IN ('job', 'side_hustle')
+			                     THEN amount_paise ELSE 0 END), 0) AS income,
+			   COALESCE(SUM(CASE WHEN bucket = 'needs' THEN amount_paise ELSE 0 END), 0) AS needs,
+			   COALESCE(SUM(CASE WHEN bucket = 'wants' THEN amount_paise ELSE 0 END), 0) AS wants,
+			   COALESCE(SUM(CASE WHEN bucket = 'investments' THEN amount_paise ELSE 0 END), 0) AS invest
+			 FROM transactions WHERE date >= ? AND date < ?
+			 GROUP BY month ORDER BY month`
+		)
+		.all(start, end) as unknown as MonthActuals[];
+}
+
 export interface YearlySummary {
 	job: Paise;
 	sideHustle: Paise;

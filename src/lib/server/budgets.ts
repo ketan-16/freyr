@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { mulBP, type Paise } from '$lib/money';
-import { monthlyActuals } from './ledger';
+import { monthlyActuals, type MonthActuals } from './ledger';
 
 export type PeriodSource = 'base' | 'promotion' | 'manual';
 
@@ -134,4 +134,84 @@ export function monthSummary(db: DatabaseSync, year: number, month: number): Mon
 	}));
 
 	return { year, month, income: actuals.income, period, rows };
+}
+
+export interface YearlyBucketRow {
+	bucket: 'needs' | 'wants' | 'investments';
+	label: string;
+	allocated: Paise;
+	actual: Paise;
+	/** actual − allocated: positive means overspent against plan. */
+	variance: Paise;
+	/**
+	 * allocated ÷ income, in basis points — the blended weight the year actually
+	 * ran at across however many splits were in force. null when income was zero,
+	 * because there is no share of nothing: 0 would read as "took no share" and a
+	 * bare divide would give NaN.
+	 */
+	effectiveBP: number | null;
+}
+
+export interface YearlyAllocation {
+	income: Paise;
+	rows: YearlyBucketRow[];
+	/** Income that never reached a bucket — the gap plan-vs-actual hides. */
+	unallocated: Paise;
+}
+
+/**
+ * Sums each month's own allocation rather than applying one rate to the year.
+ * With a promotion mid-year the two differ, and only this one is right: the
+ * months before the raise were budgeted at the old split. Each month rounds
+ * through mulBP once, so the total is a sum of exact paise and is never
+ * re-rounded.
+ *
+ * Pure over already-fetched rows, so the page costs one grouped query plus one
+ * period fetch however many months have data.
+ */
+export function yearlyAllocation(
+	periods: Period[],
+	months: MonthActuals[],
+	year: number
+): YearlyAllocation {
+	const mm = (m: number) => String(m).padStart(2, '0');
+	let income = 0;
+	const allocated = { needs: 0, wants: 0, invest: 0 };
+	const actual = { needs: 0, wants: 0, invest: 0 };
+
+	for (const month of months) {
+		income += month.income;
+		actual.needs += month.needs;
+		actual.wants += month.wants;
+		actual.invest += month.invest;
+
+		const period = periodFor(periods, `${year}-${mm(month.month)}-01`);
+		if (!period) continue;
+		const share = allocate(month.income, period);
+		allocated.needs += share.needs;
+		allocated.wants += share.wants;
+		allocated.invest += share.invest;
+	}
+
+	const effective = (a: Paise) => (income === 0 ? null : Math.round((a * 10000) / income));
+	const rows: YearlyBucketRow[] = (
+		[
+			['needs', 'Needs', allocated.needs, actual.needs],
+			['wants', 'Wants', allocated.wants, actual.wants],
+			['investments', 'Investments', allocated.invest, actual.invest]
+		] as const
+	).map(([bucket, label, alloc, act]) => ({
+		bucket,
+		label,
+		allocated: alloc,
+		actual: act,
+		variance: act - alloc,
+		effectiveBP: effective(alloc)
+	}));
+
+	return {
+		income,
+		rows,
+		unallocated: income - (actual.needs + actual.wants + actual.invest)
+	};
 }

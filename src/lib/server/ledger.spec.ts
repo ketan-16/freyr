@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { fromRupees, type Paise } from '$lib/money';
 import { createGoal, ensureLocation } from './goals';
 import {
 	createTransaction,
@@ -8,9 +9,12 @@ import {
 	listCategories,
 	listTransactions,
 	monthlyActuals,
+	monthlyActualsForYear,
 	monthsWithData,
 	years,
-	yearlySummary
+	yearlySummary,
+	type Bucket,
+	type Source
 } from './ledger';
 import { testDb } from './test-db';
 
@@ -249,5 +253,61 @@ describe('rollups', () => {
 	it('listTransactions limits to the newest rows', () => {
 		const rows = listTransactions(db, { limit: 2 });
 		expect(rows.map((r) => r.date)).toEqual(['2026-07-09', '2026-07-08']);
+	});
+});
+
+describe('monthlyActualsForYear', () => {
+	const addIncome = (date: string, amountPaise: Paise, incomeSource: Source = 'job') =>
+		createTransaction(db, { date, amountPaise, direction: 'income', incomeSource });
+	const addOutflow = (date: string, amountPaise: Paise, bucket: Bucket) =>
+		createTransaction(db, { date, amountPaise, direction: 'outflow', bucket });
+
+	it('returns one row per month with data, matching monthlyActuals exactly', () => {
+		addIncome('2025-01-10', fromRupees(100000));
+		addOutflow('2025-01-15', fromRupees(30000), 'needs');
+		addIncome('2025-06-10', fromRupees(120000));
+		addOutflow('2025-06-15', fromRupees(20000), 'wants');
+
+		const rows = monthlyActualsForYear(db, 2025);
+		expect(rows.map((r) => r.month)).toEqual([1, 6]);
+		for (const row of rows) {
+			const one = monthlyActuals(db, 2025, row.month);
+			expect({ ...row, month: undefined }).toEqual({ ...one, month: undefined });
+		}
+	});
+
+	it('returns nothing for a year with no transactions', () => {
+		expect(monthlyActualsForYear(db, 2019)).toEqual([]);
+	});
+
+	it('does not bleed across year boundaries', () => {
+		addIncome('2024-12-31', fromRupees(100000));
+		addIncome('2025-01-01', fromRupees(200000));
+		expect(monthlyActualsForYear(db, 2025).map((r) => r.month)).toEqual([1]);
+	});
+
+	it('agrees with monthlyActuals for all twelve months, present or absent', () => {
+		// Exercises every column the grouped query computes: all three buckets, both
+		// counted income sources, the excluded one, a month with outflows but no
+		// income, and the two months that bracket the year.
+		addIncome('2025-01-10', fromRupees(100000), 'job');
+		addIncome('2025-01-11', fromRupees(15000), 'side_hustle');
+		addIncome('2025-01-12', fromRupees(40000), 'other'); // a repayment, never budget income
+		addOutflow('2025-01-15', fromRupees(30000), 'needs');
+		addOutflow('2025-01-16', fromRupees(9000), 'wants');
+		addOutflow('2025-01-17', fromRupees(25000), 'investments');
+		addOutflow('2025-07-04', fromRupees(1234), 'wants'); // spend with no income
+		addIncome('2025-12-31', fromRupees(70000), 'side_hustle');
+		addIncome('2024-12-31', fromRupees(999), 'job'); // adjacent years must not leak
+		addIncome('2026-01-01', fromRupees(999), 'job');
+
+		const rows = monthlyActualsForYear(db, 2025);
+		expect(rows.map((r) => r.month)).toEqual([1, 7, 12]);
+		for (let month = 1; month <= 12; month++) {
+			const one = monthlyActuals(db, 2025, month);
+			const row = rows.find((r) => r.month === month);
+			if (row) expect({ ...row, month: undefined }).toEqual({ ...one, month: undefined });
+			else expect(one).toEqual({ income: 0, needs: 0, wants: 0, invest: 0 });
+		}
 	});
 });
