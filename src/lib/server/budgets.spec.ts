@@ -32,9 +32,23 @@ describe('createPeriod', () => {
 		expect(() => createPeriod(db, { ...P, investBP: 4000 })).toThrow(/100/);
 	});
 
-	it('rejects a duplicate effective date', () => {
+	// The settings form can reach this, so it has to arrive as a sentence rather
+	// than as raw "UNIQUE constraint failed: budget_periods.effective_from, …".
+	it('rejects a duplicate effective date in a sentence', () => {
 		createPeriod(db, P);
-		expect(() => createPeriod(db, P)).toThrow();
+		expect(() => createPeriod(db, P)).toThrow(
+			'A manual period effective 2025-01-01 already exists.'
+		);
+	});
+
+	// Only manual rows collide: source is part of the key, so a hand-typed
+	// correction can sit on the same date as the row it corrects.
+	it('accepts a date a projected period already occupies', () => {
+		db.prepare(
+			`INSERT INTO budget_periods (effective_from, needs_bp, wants_bp, invest_bp, source)
+			 VALUES ('2025-01-01', 5000, 3000, 2000, 'base')`
+		).run();
+		expect(createPeriod(db, P)).toBeGreaterThan(0);
 	});
 });
 

@@ -5,6 +5,7 @@ import {
 	createPromotion,
 	deletePromotion,
 	getPolicy,
+	listPromotionEffects,
 	listPromotions,
 	rebuildProjectedPeriods,
 	updatePolicy
@@ -279,7 +280,80 @@ describe('updatePolicy', () => {
 		).toThrow();
 		expect(getPolicy(db)).toEqual(before);
 	});
+
+	// The mirror image of createPromotion's guard. That one runs on insert and
+	// cannot see this: the ordering is broken afterwards, by a different call.
+	it('refuses to move the base past an existing raise, naming the earliest offender', () => {
+		createPromotion(db, { effectiveDate: '2022-09-15', incrementBP: 3050 });
+		createPromotion(db, { effectiveDate: '2023-04-01', incrementBP: 2000 });
+		const before = snapshot();
+
+		const err = thrownBy(() => updatePolicy(db, { ...SPLITS, baseEffectiveFrom: '2024-01-01' }));
+
+		// Both raises fall before the proposed base; the earliest is the binding
+		// constraint, so it is the one the message names.
+		expect(err.message).toBe(
+			'The base split cannot start after 2022-09-01: a raise effective 2022-09-15 would fall before it.'
+		);
+		expect(getPolicy(db).baseEffectiveFrom).toBe('2021-09-01');
+		expect(snapshot()).toEqual(before);
+	});
+
+	it("accepts a base on the earliest raise's month start, but not a day later", () => {
+		createPromotion(db, { effectiveDate: '2022-09-15', incrementBP: 3050 });
+
+		// The raise snaps onto 2022-09-01 and wins there on precedence, exactly
+		// as createPromotion allows from the other direction.
+		updatePolicy(db, { ...SPLITS, baseEffectiveFrom: '2022-09-01' });
+		expect(activeFor(db, '2022-09-01')?.source).toBe('promotion');
+
+		// One day later the base row would override the raise from the 2nd on.
+		expect(() => updatePolicy(db, { ...SPLITS, baseEffectiveFrom: '2022-09-02' })).toThrow(
+			/2022-09-15/
+		);
+	});
+
+	it('still accepts a base move when no raise is logged', () => {
+		updatePolicy(db, { ...SPLITS, baseEffectiveFrom: '2024-01-01' });
+		expect(listPeriods(db).map((p) => `${p.effectiveFrom}:${p.source}`)).toEqual([
+			'2024-01-01:base'
+		]);
+	});
 });
+
+describe('listPromotionEffects', () => {
+	it('pairs each raise with the split it produced, newest first', () => {
+		createPromotion(db, { effectiveDate: '2025-03-01', incrementBP: 1000 });
+		createPromotion(db, { effectiveDate: '2025-09-01', incrementBP: 2000 });
+		const effects = listPromotionEffects(db);
+
+		expect(effects.map((e) => e.effectiveDate)).toEqual(['2025-09-01', '2025-03-01']);
+		// Cumulative: the 10% alone, then the 10% compounded with the 20%.
+		expect(effects[1].weights.needsBP).toBe(4727);
+		expect(effects[0].weights.needsBP).toBe(4273);
+	});
+
+	// Why this is folded rather than read back off budget_periods: the two raises
+	// project one shared period, owned by the later of them, so the projection has
+	// no row to attribute to the earlier one even though it did take effect.
+	it('gives both raises in a shared month their own split', () => {
+		createPromotion(db, { effectiveDate: '2025-03-05', incrementBP: 1000 });
+		createPromotion(db, { effectiveDate: '2025-03-20', incrementBP: 2000 });
+
+		expect(listPeriods(db).filter((p) => p.effectiveFrom === '2025-03-01')).toHaveLength(1);
+		expect(listPromotionEffects(db).map((e) => e.weights.needsBP)).toEqual([4273, 4727]);
+	});
+
+	it('is empty with no raise logged', () => {
+		expect(listPromotionEffects(db)).toEqual([]);
+	});
+});
+
+/** The seeded splits, for updates that vary only the base date. */
+const SPLITS = {
+	base: { needsBP: 5000, wantsBP: 3000, investBP: 2000 },
+	marginal: { needsBP: 2000, wantsBP: 3000, investBP: 5000 }
+};
 
 /** Every period row, in a shape that compares cleanly across a rollback. */
 function snapshot(): string[] {

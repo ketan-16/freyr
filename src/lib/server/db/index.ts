@@ -31,6 +31,13 @@ function loadMigrationFiles(): Record<string, string> {
 
 const migrationFiles = loadMigrationFiles();
 
+/**
+ * SQLite's extended result code for a violated UNIQUE constraint, as node:sqlite
+ * reports it on the thrown error's `errcode`. Domain modules catch this one to
+ * turn "UNIQUE constraint failed: …" into a sentence a form can show.
+ */
+export const SQLITE_CONSTRAINT_UNIQUE = 2067;
+
 /** Opens (creating if needed) the SQLite file with the required pragmas. */
 export function open(path: string): DatabaseSync {
 	const db = new DatabaseSync(path);

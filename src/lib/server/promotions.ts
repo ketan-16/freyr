@@ -1,12 +1,18 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { monthStart } from '$lib/dates';
-import { assertTriple, weightsAfter, type Policy } from './budget-policy';
+import { assertTriple, weightsAfter, type Policy, type TripleBP } from './budget-policy';
+import { SQLITE_CONSTRAINT_UNIQUE } from './db';
 
 export interface Promotion {
 	id: number;
 	effectiveDate: string;
 	incrementBP: number;
 	note: string | null;
+}
+
+/** A raise with the split it produced — itself and every earlier raise folded in. */
+export interface PromotionEffect extends Promotion {
+	weights: TripleBP;
 }
 
 export function getPolicy(db: DatabaseSync): Policy {
@@ -37,6 +43,7 @@ export function updatePolicy(db: DatabaseSync, p: Policy): void {
 		throw new Error('Base effective-from must be YYYY-MM-DD.');
 	assertTriple(p.base, 'Base split');
 	assertTriple(p.marginal, 'Raise split');
+	assertBaseNotAfterPromotions(db, p.baseEffectiveFrom);
 
 	inTransaction(db, () => {
 		db.prepare(
@@ -57,6 +64,32 @@ export function updatePolicy(db: DatabaseSync, p: Policy): void {
 	});
 }
 
+/**
+ * The same invariant createPromotion enforces, from the other side: no projected
+ * promotion row may precede the base row. Moving the base forward past a raise
+ * breaks it after the fact — the base row would land later and override the
+ * raise, silently dropping it from the projection until the next one compounded
+ * it back in. Compared the way project() writes them, month start against the
+ * base row's own date, so the two guards agree on the boundary.
+ *
+ * The earliest raise is the binding constraint — it is the first to fall before
+ * any base date — so it is the one named. UNIQUE(effective_date) indexes the
+ * lookup, so this is one indexed row however long the log gets.
+ */
+function assertBaseNotAfterPromotions(db: DatabaseSync, baseEffectiveFrom: string): void {
+	const row = db
+		.prepare('SELECT effective_date FROM promotions ORDER BY effective_date LIMIT 1')
+		.get() as { effective_date: string } | undefined;
+	if (!row) return;
+
+	const latestLegal = monthStart(row.effective_date);
+	if (latestLegal < baseEffectiveFrom)
+		throw new Error(
+			`The base split cannot start after ${latestLegal}: ` +
+				`a raise effective ${row.effective_date} would fall before it.`
+		);
+}
+
 /** Newest first, matching how the settings page lists them. */
 export function listPromotions(db: DatabaseSync): Promotion[] {
 	const rows = db
@@ -71,6 +104,32 @@ export function listPromotions(db: DatabaseSync): Promotion[] {
 		incrementBP: r.increment_bp as number,
 		note: (r.note as string | null) ?? null
 	}));
+}
+
+/**
+ * Each raise with the split it produced, oldest first. The fold is cumulative —
+ * a raise's weights include every earlier one — which is what makes the closed
+ * form drift-free.
+ */
+function fold(policy: Policy, ascending: Promotion[]): PromotionEffect[] {
+	const increments: number[] = [];
+	return ascending.map((promotion) => {
+		increments.push(promotion.incrementBP);
+		return { ...promotion, weights: weightsAfter(policy, increments) };
+	});
+}
+
+/**
+ * The promotion log carrying each raise's resulting split. Newest first, like
+ * listPromotions.
+ *
+ * Folded rather than read back off budget_periods on purpose: two raises inside
+ * one month project a single period owned by the later of them, so the
+ * projection has no row to attribute to the earlier raise even though it did
+ * take effect. The fold gives every raise the split it produced.
+ */
+export function listPromotionEffects(db: DatabaseSync): PromotionEffect[] {
+	return fold(getPolicy(db), listPromotions(db).reverse()).reverse();
 }
 
 export function createPromotion(
@@ -102,10 +161,10 @@ export function createPromotion(
 	});
 }
 
-/** SQLITE_CONSTRAINT_UNIQUE. The only UNIQUE on promotions is effective_date. */
-const SQLITE_CONSTRAINT_UNIQUE = 2067;
-
-/** Translates the one constraint an ordinary entry can hit into a sentence. */
+/**
+ * Translates the one constraint an ordinary entry can hit into a sentence. The
+ * only UNIQUE on promotions is effective_date.
+ */
 function insertPromotion(
 	db: DatabaseSync,
 	p: { effectiveDate: string; incrementBP: number; note?: string | null }
@@ -178,19 +237,11 @@ function project(db: DatabaseSync): void {
 	const base = weightsAfter(policy, []);
 	insert.run(policy.baseEffectiveFrom, base.needsBP, base.wantsBP, base.investBP, 'base', null);
 
-	const increments: number[] = [];
-	const byMonth = new Map<
-		string,
-		{ needsBP: number; wantsBP: number; investBP: number; id: number }
-	>();
-	for (const promotion of ascending) {
-		increments.push(promotion.incrementBP);
+	const byMonth = new Map<string, TripleBP & { id: number }>();
+	for (const effect of fold(policy, ascending)) {
 		// Later promotions in the same month overwrite earlier ones, keeping the
 		// fully compounded weights and the last promotion as the owning row.
-		byMonth.set(monthStart(promotion.effectiveDate), {
-			...weightsAfter(policy, increments),
-			id: promotion.id
-		});
+		byMonth.set(monthStart(effect.effectiveDate), { ...effect.weights, id: effect.id });
 	}
 
 	for (const [effectiveFrom, w] of byMonth)

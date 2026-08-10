@@ -2,9 +2,10 @@ import { isRedirect } from '@sveltejs/kit';
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { dayBoundIn, daysInMonth, MONTH_NAMES, prevMonth, todayISO } from '$lib/dates';
-import { createPeriod } from '$lib/server/budgets';
+import { activeFor, createPeriod } from '$lib/server/budgets';
 import { createGoal, ensureLocation } from '$lib/server/goals';
 import { createTransaction, listTransactions } from '$lib/server/ledger';
+import { createPromotion, rebuildProjectedPeriods } from '$lib/server/promotions';
 import { createLending } from '$lib/server/registry';
 import { testDb } from '$lib/server/test-db';
 import * as home from './+page.server';
@@ -448,10 +449,10 @@ describe('yearly comparison', () => {
 });
 
 describe('budget settings page', () => {
-	it('creates a period from percent inputs', async () => {
+	it('creates a manual period from percent inputs', async () => {
 		await expect(
-			budget.actions.default(
-				event('/settings/budget', {
+			budget.actions.addPeriod(
+				event('/settings/budget?/addPeriod', {
 					effective_from: '2026-01-01',
 					needs: '27.20',
 					wants: '30',
@@ -462,11 +463,12 @@ describe('budget settings page', () => {
 		const data = budget.load(event('/settings/budget')) as any;
 		expect(data.periods).toHaveLength(1);
 		expect(data.periods[0].needsBP).toBe(2720);
+		expect(data.periods[0].source).toBe('manual');
 	});
 
-	it('rejects a bad sum with values preserved', async () => {
-		const result = (await budget.actions.default(
-			event('/settings/budget', {
+	it('rejects a bad sum with values preserved, on the period form', async () => {
+		const result = (await budget.actions.addPeriod(
+			event('/settings/budget?/addPeriod', {
 				effective_from: '2026-01-01',
 				needs: '27.20',
 				wants: '30',
@@ -476,6 +478,101 @@ describe('budget settings page', () => {
 		expect(result.status).toBe(400);
 		expect(result.data.error).toMatch(/sum to 100/);
 		expect(result.data.values.invest).toBe('40');
+		// Four forms post to this page; only the one that failed shows the message.
+		expect(result.data.failed).toBe('addPeriod');
+	});
+});
+
+describe('/settings/budget promotions', () => {
+	// A fresh database has a policy but no projection, so the base row this
+	// asserts only exists once something has written. See the report: closing
+	// that (a boot-time or migration-time rebuild) is out of this task's scope.
+	it('loads policy, promotions and periods together', () => {
+		rebuildProjectedPeriods(db);
+		const data = budget.load(event('/settings/budget')) as any;
+		expect(data.policy.marginal.investBP).toBe(5000);
+		expect(data.promotions).toEqual([]);
+		expect(data.periods.some((p: { source: string }) => p.source === 'base')).toBe(true);
+	});
+
+	it('addPromotion projects a period and redirects', async () => {
+		await expect(
+			budget.actions.addPromotion(
+				event('/settings/budget?/addPromotion', {
+					effective_date: '2025-09-15',
+					increment: '20',
+					note: ' first raise '
+				})
+			)
+		).rejects.toSatisfy(isRedirect);
+		expect(activeFor(db, '2025-09-01')?.source).toBe('promotion');
+		const data = budget.load(event('/settings/budget')) as any;
+		expect(data.promotions[0].note).toBe('first raise');
+	});
+
+	it('carries the split each raise produced', () => {
+		createPromotion(db, { effectiveDate: '2025-09-15', incrementBP: 2000 });
+		const data = budget.load(event('/settings/budget')) as any;
+		// 50/30/20 base pulled 20% of the way to a 20/30/50 margin.
+		expect(data.promotions[0].weights).toEqual({ needsBP: 4500, wantsBP: 3000, investBP: 2500 });
+	});
+
+	it('reports a bad raise without throwing, keeping what was typed', async () => {
+		const result = (await budget.actions.addPromotion(
+			event('/settings/budget?/addPromotion', { effective_date: '2025-09-15', increment: '0' })
+		)) as any;
+		expect(result.status).toBe(400);
+		expect(result.data.error).toMatch(/greater than zero/);
+		expect(result.data.values.increment).toBe('0');
+		expect(result.data.failed).toBe('addPromotion');
+	});
+
+	it('deletePromotion drops the raise and reprojects', async () => {
+		const id = createPromotion(db, { effectiveDate: '2025-09-15', incrementBP: 2000 });
+		await expect(
+			budget.actions.deletePromotion(event('/settings/budget?/deletePromotion', { id: String(id) }))
+		).rejects.toSatisfy(isRedirect);
+		// The projected period went with it, leaving the base row in force.
+		expect(activeFor(db, '2025-09-01')?.source).toBe('base');
+	});
+
+	it('savePolicy stores the split and reprojects every period', async () => {
+		createPromotion(db, { effectiveDate: '2025-09-15', incrementBP: 2000 });
+		await expect(
+			budget.actions.savePolicy(
+				event('/settings/budget?/savePolicy', {
+					base_effective_from: '2021-09-01',
+					base_needs: '50',
+					base_wants: '30',
+					base_invest: '20',
+					marg_needs: '50',
+					marg_wants: '30',
+					marg_invest: '20'
+				})
+			)
+		).rejects.toSatisfy(isRedirect);
+		// A raise split equal to the base never moves the weights, so the raise's
+		// own period now carries the base ones.
+		expect(activeFor(db, '2025-09-01')?.needsBP).toBe(5000);
+	});
+
+	it('savePolicy reports a base date that would orphan a raise', async () => {
+		createPromotion(db, { effectiveDate: '2025-09-15', incrementBP: 2000 });
+		const result = (await budget.actions.savePolicy(
+			event('/settings/budget?/savePolicy', {
+				base_effective_from: '2026-01-01',
+				base_needs: '50',
+				base_wants: '30',
+				base_invest: '20',
+				marg_needs: '20',
+				marg_wants: '30',
+				marg_invest: '50'
+			})
+		)) as any;
+		expect(result.status).toBe(400);
+		expect(result.data.error).toMatch(/2025-09-15/);
+		expect(result.data.values.base_effective_from).toBe('2026-01-01');
+		expect(result.data.failed).toBe('savePolicy');
 	});
 });
 

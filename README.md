@@ -5,8 +5,9 @@ planning tools, all in one place. Replaces a 12-sheet Excel workbook. Built to s
 grow over time, and stay snappy.
 
 > **Status:** Phase 0+1 complete — auth, transaction ledger, monthly/yearly budget views,
-> budget periods, home dashboard, daily backups, and the one-time Excel seed import all
-> work. Phases 2–4 (goals UI, registries UI, planners) are next.
+> a raise policy and promotion log that project the budget periods, home dashboard, daily
+> backups, and the one-time Excel seed import all work. Phases 2–4 (goals UI, registries UI,
+> planners) are next.
 
 ## Stack
 

@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { mulBP, type Paise } from '$lib/money';
+import { SQLITE_CONSTRAINT_UNIQUE } from './db';
 import { monthlyActuals, type MonthActuals } from './ledger';
 
 export type PeriodSource = 'base' | 'promotion' | 'manual';
@@ -24,19 +25,35 @@ const ORDER_SQL = `ORDER BY effective_from DESC, ${PRECEDENCE_SQL} DESC, id DESC
 const SELECT_SQL = `SELECT id, effective_from, needs_bp, wants_bp, invest_bp, source
                     FROM budget_periods`;
 
+/**
+ * Inserts a hand-typed correction. `source` defaults to 'manual', so the row
+ * survives every projection rebuild and outranks a generated row on its date.
+ */
 export function createPeriod(db: DatabaseSync, p: Omit<Period, 'id' | 'source'>): number {
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(p.effectiveFrom))
 		throw new Error('Effective-from must be YYYY-MM-DD.');
 	const sum = p.needsBP + p.wantsBP + p.investBP;
 	if (sum !== 10000)
 		throw new Error(`Percentages must sum to 100% (got ${(sum / 100).toFixed(2)}%).`);
-	const result = db
-		.prepare(
-			`INSERT INTO budget_periods (effective_from, needs_bp, wants_bp, invest_bp)
-			 VALUES (?, ?, ?, ?)`
-		)
-		.run(p.effectiveFrom, p.needsBP, p.wantsBP, p.investBP);
-	return Number(result.lastInsertRowid);
+
+	try {
+		const result = db
+			.prepare(
+				`INSERT INTO budget_periods (effective_from, needs_bp, wants_bp, invest_bp)
+				 VALUES (?, ?, ?, ?)`
+			)
+			.run(p.effectiveFrom, p.needsBP, p.wantsBP, p.investBP);
+		return Number(result.lastInsertRowid);
+	} catch (err) {
+		// The only UNIQUE here is (effective_from, source), which the settings
+		// form reaches by adding the same date twice. Raw constraint text is
+		// demoted to the cause rather than shown.
+		if ((err as { errcode?: number }).errcode === SQLITE_CONSTRAINT_UNIQUE)
+			throw new Error(`A manual period effective ${p.effectiveFrom} already exists.`, {
+				cause: err
+			});
+		throw err;
+	}
 }
 
 export function listPeriods(db: DatabaseSync): Period[] {
