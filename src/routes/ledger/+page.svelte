@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import EntryBar from '$lib/components/EntryBar.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import Money from '$lib/components/Money.svelte';
 	import { MONTH_NAMES, monthLabel } from '$lib/dates';
 	import { formatMoney } from '$lib/money';
 
@@ -72,8 +73,8 @@
 			{#each data.transactions as t (t.id)}
 				<tr>
 					<td data-label="Date" class="num">{t.date}</td>
-					<td data-label="Amount" class="num amount {t.direction === 'income' ? 'pos' : ''}">
-						{t.direction === 'income' ? '+' : ''}{formatMoney(t.amountPaise)}
+					<td data-label="Amount" class="num amount">
+						<Money value={t.amountPaise} direction={t.direction} />
 					</td>
 					<td data-label="Type">
 						{#if t.direction === 'income'}
