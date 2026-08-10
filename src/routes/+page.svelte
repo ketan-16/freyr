@@ -138,8 +138,7 @@
 </div>
 
 <h2>Add</h2>
-<EntryBar action="?/create" entry={data.entry} values={form?.values} />
-{#if form?.error}<p class="error">{form.error}</p>{/if}
+<EntryBar action="?/create" entry={data.entry} values={form?.values} error={form?.error} />
 
 <h2>Recent</h2>
 <div class="table-wrap">

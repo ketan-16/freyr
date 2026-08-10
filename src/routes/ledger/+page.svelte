@@ -53,8 +53,7 @@
 	<noscript><button type="submit">Filter</button></noscript>
 </form>
 
-<EntryBar action="?/create" entry={data.entry} values={form?.values} />
-{#if form?.error}<p class="error">{form.error}</p>{/if}
+<EntryBar action="?/create" entry={data.entry} values={form?.values} error={form?.error} />
 
 <div class="table-wrap">
 	<table>

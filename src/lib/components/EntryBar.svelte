@@ -15,11 +15,19 @@
 	let {
 		action,
 		entry,
-		values
+		values,
+		error
 	}: {
 		action: string;
 		entry: { today: string; categories: Category[]; goals: Named[]; locations: Named[] };
 		values?: Record<string, string>;
+		/**
+		 * The failed submission's message. It lives here rather than beside the
+		 * bar on each page so it is announced and tied to the amount field from
+		 * one place — `use:enhance` never reloads, so an unassociated message is
+		 * silent to a screen reader.
+		 */
+		error?: string;
 	} = $props();
 
 	let amountInput: HTMLInputElement | undefined = $state();
@@ -52,6 +60,7 @@
 				value={values?.amount ?? ''}
 				inputmode="decimal"
 				autocomplete="off"
+				aria-describedby={error ? 'e-error' : undefined}
 				required
 			/>
 		</div>
@@ -108,4 +117,10 @@
 		</div>
 		<button class="primary" type="submit">Add</button>
 	</form>
+	<!--
+	  Outside the flex form so it takes its own line, and announced on insertion:
+	  the failed submit returns focus to the amount field, which describes itself
+	  with this message.
+	-->
+	{#if error}<p class="error" id="e-error" role="alert">{error}</p>{/if}
 </details>
