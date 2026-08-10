@@ -1102,8 +1102,22 @@ button.icon {
 	}
 
 	/* Cells whose value is absent drop their `data-label` in the template, so a
-	   card shows only the fields that actually carry information. */
-	tbody td:not([data-label]) {
+	   card shows only the fields that actually carry information. The empty
+	   state is carved out: it is not a field with a missing value, it is the
+	   table's only content when there is none, and hiding it left every empty
+	   table blank on the device this app is used on most. */
+	tbody td:not([data-label]):not(.empty) {
+		display: none;
+	}
+
+	/* One plain line in its own card — no label to sit opposite, so no flex row
+	   and no `::before` (which would resolve to an empty string and, as a flex
+	   item, push the sentence to the right under `space-between`). */
+	tbody td.empty {
+		display: block;
+	}
+
+	tbody td.empty::before {
 		display: none;
 	}
 
