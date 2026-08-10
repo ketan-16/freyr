@@ -104,10 +104,16 @@
 		{:else}
 			<div class="field">
 				<label for="e-source">Source</label>
+				<!--
+				  Only job and side_hustle here: every rollup — monthly allocation,
+				  the yearly split — counts those two, so income booked as 'other'
+				  would show green in the ledger while the month still read as
+				  awaiting income. The enum keeps 'other' for imported rows; do not
+				  offer it until the rollups count it.
+				-->
 				<select id="e-source" name="source">
 					<option value="job">Job</option>
 					<option value="side_hustle">Side hustle</option>
-					<option value="other">Other</option>
 				</select>
 			</div>
 		{/if}
