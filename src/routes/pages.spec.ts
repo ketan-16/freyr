@@ -140,6 +140,28 @@ describe('monthly page', () => {
 	});
 });
 
+describe('monthly comparison', () => {
+	it('compares a completed month against the whole prior month', () => {
+		createTransaction(db, {
+			date: '2026-06-20',
+			amountPaise: 700000,
+			direction: 'outflow',
+			bucket: 'wants'
+		});
+		createTransaction(db, {
+			date: '2026-07-05',
+			amountPaise: 300000,
+			direction: 'outflow',
+			bucket: 'wants'
+		});
+
+		const data = monthly.load(event('/monthly?year=2026&month=7')) as any;
+		expect(data.isCurrentMonth).toBe(false);
+		expect(data.prior.spent).toBe(700000);
+		expect(data.prior.label).toBe('June');
+	});
+});
+
 describe('yearly page', () => {
 	it('splits income and lists months with data', () => {
 		seedJuly();
