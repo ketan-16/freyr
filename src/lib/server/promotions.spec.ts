@@ -56,6 +56,63 @@ describe('createPromotion', () => {
 		expect(() => createPromotion(db, { effectiveDate: '2022-09-15', incrementBP: 1000 })).toThrow();
 	});
 
+	it('rejects a duplicate date in a sentence, keeping the SQLite text as the cause', () => {
+		createPromotion(db, { effectiveDate: '2022-09-15', incrementBP: 3050 });
+		const err = thrownBy(() =>
+			createPromotion(db, { effectiveDate: '2022-09-15', incrementBP: 1000 })
+		);
+
+		expect(err.message).toBe('A raise effective 2022-09-15 already exists.');
+		// Raw constraint text is demoted to the cause, not lost and not shown.
+		expect((err.cause as Error).message).toMatch(/UNIQUE constraint failed/);
+	});
+
+	it('rejects a raise dated before the month the base split starts in', () => {
+		// One day earlier than the base month — the far side of the boundary.
+		const err = thrownBy(() =>
+			createPromotion(db, { effectiveDate: '2021-08-31', incrementBP: 5000 })
+		);
+
+		expect(err.message).toBe(
+			'A raise cannot take effect before the base split starts (2021-09-01).'
+		);
+		expect(listPromotions(db)).toHaveLength(0);
+	});
+
+	it('accepts a raise on the base split date itself', () => {
+		expect(createPromotion(db, { effectiveDate: '2021-09-01', incrementBP: 5000 })).toBeGreaterThan(
+			0
+		);
+	});
+
+	it("accepts a raise inside the base split's own month, where it wins the period", () => {
+		createPromotion(db, { effectiveDate: '2021-09-20', incrementBP: 5000 });
+		const period = activeFor(db, '2021-09-01');
+
+		// Snapped to the base row's own date; precedence hands the period to the
+		// promotion, which is why this case is legitimate rather than inverted.
+		expect(period?.effectiveFrom).toBe('2021-09-01');
+		expect(period?.source).toBe('promotion');
+		expect([period?.needsBP, period?.wantsBP, period?.investBP]).toEqual([4000, 3000, 3000]);
+	});
+
+	it('measures against the base row date, so a mid-month base cannot be undercut', () => {
+		updatePolicy(db, {
+			baseEffectiveFrom: '2021-09-15',
+			base: { needsBP: 5000, wantsBP: 3000, investBP: 2000 },
+			marginal: { needsBP: 2000, wantsBP: 3000, investBP: 5000 }
+		});
+
+		// Snaps to 2021-09-01 — inside the base's month, but genuinely before the
+		// base row, which would therefore override it from the 15th onward.
+		expect(() => createPromotion(db, { effectiveDate: '2021-09-20', incrementBP: 5000 })).toThrow(
+			/\(2021-09-15\)/
+		);
+		expect(createPromotion(db, { effectiveDate: '2021-10-02', incrementBP: 5000 })).toBeGreaterThan(
+			0
+		);
+	});
+
 	it('compounds two promotions inside one year', () => {
 		createPromotion(db, { effectiveDate: '2025-03-01', incrementBP: 1000 });
 		createPromotion(db, { effectiveDate: '2025-09-01', incrementBP: 2000 });
@@ -139,6 +196,21 @@ describe('rebuildProjectedPeriods', () => {
 
 		expect(snapshot()).toEqual(before);
 	});
+
+	it('propagates the original failure when SQLite has already rolled back', () => {
+		createPromotion(db, { effectiveDate: '2022-09-15', incrementBP: 3050 });
+		const before = snapshot();
+
+		// RAISE(ROLLBACK) unwinds the transaction itself, so the explicit ROLLBACK
+		// that follows finds nothing active — the same position a full or
+		// unwritable disk leaves us in. Unguarded, that second failure throws
+		// "cannot rollback - no transaction is active" over the real cause.
+		autoRollbackNextProjection();
+		expect(() => rebuildProjectedPeriods(db)).toThrow(/disk exploded/);
+		dropProjectionFailure();
+
+		expect(snapshot()).toEqual(before);
+	});
 });
 
 describe('deletePromotion', () => {
@@ -216,16 +288,42 @@ function snapshot(): string[] {
 	);
 }
 
+/** The error a call threw, for asserting on its message and cause. */
+function thrownBy(fn: () => unknown): Error {
+	try {
+		fn();
+	} catch (err) {
+		return err as Error;
+	}
+	throw new Error('expected the call to throw, but it returned');
+}
+
 /**
  * Makes the next projection blow up on its promotion insert — i.e. after the
  * delete and the base row have already been written. A temp trigger is the one
  * way to fail mid-rebuild without reaching into the module under test.
+ *
+ * ABORT undoes only the statement, leaving the transaction open for our own
+ * ROLLBACK to unwind.
  */
 function failNextProjection(): void {
+	raiseOnNextProjection('ABORT', 'projection exploded');
+}
+
+/**
+ * As above, but ROLLBACK unwinds the whole transaction inside SQLite, so our
+ * ROLLBACK arrives to find none active. This is the reachable stand-in for
+ * SQLITE_FULL and I/O errors, which do the same thing.
+ */
+function autoRollbackNextProjection(): void {
+	raiseOnNextProjection('ROLLBACK', 'disk exploded');
+}
+
+function raiseOnNextProjection(action: 'ABORT' | 'ROLLBACK', message: string): void {
 	db.exec(
 		`CREATE TEMP TRIGGER fail_projection BEFORE INSERT ON budget_periods
 		 WHEN NEW.source = 'promotion'
-		 BEGIN SELECT RAISE(ABORT, 'projection exploded'); END`
+		 BEGIN SELECT RAISE(${action}, '${message}'); END`
 	);
 }
 

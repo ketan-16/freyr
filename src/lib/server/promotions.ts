@@ -82,13 +82,43 @@ export function createPromotion(
 	if (!Number.isInteger(p.incrementBP) || p.incrementBP <= 0)
 		throw new Error('Raise must be greater than zero.');
 
+	// The invariant: no projected promotion row may precede the base row. One
+	// that did would be overridden by the base, silently dropping the raise
+	// until a later one compounded it back in. So compare what project() will
+	// actually write — the promotion's month start — against the base row's own
+	// date. With the usual month-start base that accepts a raise anywhere in the
+	// base's own month, since it snaps onto the base's date and wins there on
+	// precedence; it still refuses one that would land genuinely earlier.
+	const policy = getPolicy(db);
+	if (monthStart(p.effectiveDate) < policy.baseEffectiveFrom)
+		throw new Error(
+			`A raise cannot take effect before the base split starts (${policy.baseEffectiveFrom}).`
+		);
+
 	return inTransaction(db, () => {
-		const result = db
-			.prepare('INSERT INTO promotions (effective_date, increment_bp, note) VALUES (?, ?, ?)')
-			.run(p.effectiveDate, p.incrementBP, p.note ?? null);
+		const result = insertPromotion(db, p);
 		project(db);
 		return Number(result.lastInsertRowid);
 	});
+}
+
+/** SQLITE_CONSTRAINT_UNIQUE. The only UNIQUE on promotions is effective_date. */
+const SQLITE_CONSTRAINT_UNIQUE = 2067;
+
+/** Translates the one constraint an ordinary entry can hit into a sentence. */
+function insertPromotion(
+	db: DatabaseSync,
+	p: { effectiveDate: string; incrementBP: number; note?: string | null }
+) {
+	try {
+		return db
+			.prepare('INSERT INTO promotions (effective_date, increment_bp, note) VALUES (?, ?, ?)')
+			.run(p.effectiveDate, p.incrementBP, p.note ?? null);
+	} catch (err) {
+		if ((err as { errcode?: number }).errcode === SQLITE_CONSTRAINT_UNIQUE)
+			throw new Error(`A raise effective ${p.effectiveDate} already exists.`, { cause: err });
+		throw err;
+	}
 }
 
 export function deletePromotion(db: DatabaseSync, id: number): void {
@@ -111,7 +141,14 @@ function inTransaction<T>(db: DatabaseSync, fn: () => T): T {
 		db.exec('COMMIT');
 		return out;
 	} catch (err) {
-		db.exec('ROLLBACK');
+		try {
+			db.exec('ROLLBACK');
+		} catch {
+			// SQLite unwinds the transaction itself on some failures (a full or
+			// unwritable disk), leaving nothing to roll back. The explicit
+			// ROLLBACK then throws "no transaction is active" — swallowing that
+			// keeps the propagated error the one that explains why we got here.
+		}
 		throw err;
 	}
 }
