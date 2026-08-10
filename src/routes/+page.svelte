@@ -4,6 +4,7 @@
 	import Meter from '$lib/components/Meter.svelte';
 	import Money from '$lib/components/Money.svelte';
 	import { monthLabel } from '$lib/dates';
+	import { formatCell } from '$lib/format';
 	import { formatMoney } from '$lib/money';
 	import { meter } from '$lib/progress';
 
@@ -15,6 +16,7 @@
 	// of the rows' remaining, never an independently computed income − spent.
 	const left = $derived(s.rows.reduce((total, row) => total + (row.remaining ?? 0), 0));
 	const daysLeft = $derived(data.daysInMonth - data.day);
+	const daysWord = $derived(daysLeft === 1 ? 'day' : 'days');
 	/**
 	 * Whether there is anything for the headline to be "left" of: a period to
 	 * allocate by, and income for it to allocate. Missing either, every row's
@@ -50,7 +52,8 @@
 		/>
 	</p>
 	<p class="hero-sub">
-		of {formatMoney(allocated)} allocated · {daysLeft} days remaining
+		of {formatMoney(allocated)} allocated · {daysLeft}
+		{daysWord} remaining
 	</p>
 {:else}
 	<!--
@@ -69,7 +72,8 @@
 		/>
 	</p>
 	<p class="hero-sub">
-		{data.awaitingIncome ? "Awaiting this month's income" : 'Spent so far'} · {daysLeft} days remaining
+		{data.awaitingIncome ? "Awaiting this month's income" : 'Spent so far'} · {daysLeft}
+		{daysWord} remaining
 	</p>
 	{#if data.awaitingIncome}
 		<p class="notice">
@@ -85,6 +89,7 @@
 	</p>
 {/if}
 
+<h2>Buckets</h2>
 <div class="table-wrap">
 	<table>
 		<thead>
@@ -210,4 +215,4 @@
 	</table>
 </div>
 
-<p class="hero-sub">Lendings outstanding {formatMoney(data.lendingsOutstanding)}</p>
+<p class="hero-sub">Lendings outstanding {formatCell(data.lendingsOutstanding)}</p>

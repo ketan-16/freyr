@@ -4,7 +4,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import Money from '$lib/components/Money.svelte';
 	import { MONTH_NAMES, monthLabel } from '$lib/dates';
-	import { formatMoney } from '$lib/money';
+	import { formatCell } from '$lib/format';
 
 	let { data, form } = $props();
 
@@ -29,7 +29,7 @@
 	<h1>Ledger</h1>
 	<span class="muted">{monthLabel(data.filters.year, data.filters.month)}</span>
 	<span class="muted">·</span>
-	<span class="muted num">{data.transactions.length} entries, {formatMoney(total)} out</span>
+	<span class="muted num">{data.transactions.length} entries, {formatCell(total)} out</span>
 </div>
 
 <form class="toolbar" method="GET">
