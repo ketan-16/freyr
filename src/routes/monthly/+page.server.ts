@@ -18,9 +18,16 @@ export const load: PageServerLoad = ({ locals, url }) => {
 		: undefined;
 	const priorActuals = monthlyActuals(locals.db, prev.year, prev.month, through);
 
+	const summary = monthSummary(locals.db, year, month);
+
 	return {
-		summary: monthSummary(locals.db, year, month),
+		summary,
 		isCurrentMonth,
+		// Allocation is a share of the income booked in the month, so with none
+		// booked every bucket allocates 0 and remaining folds to 0 − actual.
+		// Home reads that as awaiting income rather than three blown budgets;
+		// monthly must not contradict it.
+		awaitingIncome: summary.income === 0,
 		prior: {
 			label: MONTH_NAMES[prev.month - 1],
 			income: priorActuals.income,

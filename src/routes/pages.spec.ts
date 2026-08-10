@@ -1,7 +1,7 @@
 import { isRedirect } from '@sveltejs/kit';
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { MONTH_NAMES, prevMonth, todayISO } from '$lib/dates';
+import { dayBoundIn, daysInMonth, MONTH_NAMES, prevMonth, todayISO } from '$lib/dates';
 import { createPeriod } from '$lib/server/budgets';
 import { createGoal, ensureLocation } from '$lib/server/goals';
 import { createTransaction, listTransactions } from '$lib/server/ledger';
@@ -138,6 +138,30 @@ describe('monthly page', () => {
 		const data = monthly.load(event('/monthly?year=2020&month=1')) as any;
 		expect(data.summary.period).toBeNull();
 	});
+
+	it('reports awaiting-income for a month with no income booked', () => {
+		createPeriod(db, { effectiveFrom: '2020-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		createTransaction(db, {
+			date: '2026-07-03',
+			amountPaise: 482000,
+			direction: 'outflow',
+			bucket: 'needs'
+		});
+
+		const data = monthly.load(event('/monthly?year=2026&month=7')) as any;
+		expect(data.awaitingIncome).toBe(true);
+		// A period in force with no income allocates zero, so remaining folds to
+		// −actual. That raw figure is the "three blown budgets" the flag exists to
+		// suppress in the markup; the domain still reports it faithfully.
+		const needs = data.summary.rows.find((r: any) => r.bucket === 'needs');
+		expect(needs.remaining).toBe(-482000);
+	});
+
+	it('clears awaiting-income once income lands', () => {
+		seedJuly();
+		const data = monthly.load(event('/monthly?year=2026&month=7')) as any;
+		expect(data.awaitingIncome).toBe(false);
+	});
 });
 
 describe('monthly comparison', () => {
@@ -159,6 +183,37 @@ describe('monthly comparison', () => {
 		expect(data.isCurrentMonth).toBe(false);
 		expect(data.prior.spent).toBe(700000);
 		expect(data.prior.label).toBe('June');
+	});
+
+	// The current-month branch depends on today's date, so it seeds relative to
+	// today rather than at fixed dates that would drift out of range.
+	it('bounds the prior month to the same day when the month is current', () => {
+		const today = todayISO();
+		const prev = prevMonth(Number(today.slice(0, 4)), Number(today.slice(5, 7)));
+		const day = Number(today.slice(8, 10));
+		// The bound is exclusive, so the day it names is the first day left out
+		// and the day before it is the last one counted — whatever today is.
+		const firstExcluded = dayBoundIn(prev.year, prev.month, day);
+		const lastCounted = `${prev.year}-${String(prev.month).padStart(2, '0')}-${String(
+			Math.min(day, daysInMonth(prev.year, prev.month))
+		).padStart(2, '0')}`;
+
+		createTransaction(db, {
+			date: lastCounted,
+			amountPaise: 500000,
+			direction: 'outflow',
+			bucket: 'needs'
+		});
+		createTransaction(db, {
+			date: firstExcluded,
+			amountPaise: 900000,
+			direction: 'outflow',
+			bucket: 'wants'
+		});
+
+		const data = monthly.load(event('/monthly')) as any;
+		expect(data.isCurrentMonth).toBe(true);
+		expect(data.prior.spent).toBe(500000);
 	});
 });
 

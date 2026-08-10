@@ -5,7 +5,7 @@
 	import Meter from '$lib/components/Meter.svelte';
 	import Money from '$lib/components/Money.svelte';
 	import { monthLabel, nextMonth, prevMonth } from '$lib/dates';
-	import { formatBP, formatMoney } from '$lib/money';
+	import { formatBP } from '$lib/money';
 	import { meter } from '$lib/progress';
 
 	let { data } = $props();
@@ -14,6 +14,7 @@
 	const prev = $derived(prevMonth(s.year, s.month));
 	const next = $derived(nextMonth(s.year, s.month));
 	const spent = $derived(s.rows.reduce((t, r) => t + r.actual, 0));
+	const left = $derived(s.income - spent);
 	const prevHref = $derived(`/monthly?year=${prev.year}&month=${prev.month}`);
 	const nextHref = $derived(`/monthly?year=${next.year}&month=${next.month}`);
 
@@ -55,12 +56,14 @@
 <div class="kpis">
 	<div class="kpi">
 		<div class="label">Income</div>
-		<div class="value pos">{formatMoney(s.income)}</div>
+		<!-- Green only ever arrives with a sign: the money-cell convention carries
+		     the `+`, so the tile reads the same way as the rows beneath it. -->
+		<div class="value"><Money value={s.income} direction="income" /></div>
 		<Delta current={s.income} previous={data.prior.income} label="vs {data.prior.label}" />
 	</div>
 	<div class="kpi">
 		<div class="label">Spent</div>
-		<div class="value">{formatMoney(spent)}</div>
+		<div class="value"><Money value={spent} /></div>
 		<Delta
 			current={spent}
 			previous={data.prior.spent}
@@ -68,9 +71,16 @@
 			label="vs {data.prior.label}"
 		/>
 	</div>
+	<!--
+	  With no income booked there is nothing to be left of: income − spent is
+	  merely −spent, which is not an overspend. Say nothing yet rather than paint
+	  the month red before payday.
+	-->
 	<div class="kpi">
 		<div class="label">Left</div>
-		<div class="value {s.income - spent < 0 ? 'neg' : ''}">{formatMoney(s.income - spent)}</div>
+		<div class="value {!data.awaitingIncome && left < 0 ? 'neg' : ''}">
+			{#if data.awaitingIncome}<span class="faint">—</span>{:else}<Money value={left} />{/if}
+		</div>
 	</div>
 </div>
 
@@ -78,6 +88,11 @@
 	<p class="notice">
 		No budget period covers this month yet — set one in
 		<a href="/settings/budget">Budget settings</a>.
+	</p>
+{:else if data.awaitingIncome}
+	<p class="notice">
+		No income is booked for {monthLabel(s.year, s.month)}, so there is nothing to allocate. Buckets
+		show what was spent; targets appear once income lands.
 	</p>
 {/if}
 
@@ -110,11 +125,24 @@
 						<Money value={row.allocated ?? 0} />
 					</td>
 					<td data-label="Actual" class="num amount"><Money value={row.actual} /></td>
+					<!--
+					  Before income lands there is no allocation to have anything left
+					  of, so remaining is not "0 − actual" overspend — it is nothing
+					  yet, exactly as home renders it.
+					-->
 					<td
 						data-label="Remaining"
-						class="num amount {row.remaining == null ? '' : row.remaining < 0 ? 'neg' : ''}"
+						class="num amount {data.awaitingIncome || row.remaining == null
+							? ''
+							: row.remaining < 0
+								? 'neg'
+								: ''}"
 					>
-						<Money value={row.remaining ?? 0} />
+						{#if data.awaitingIncome}
+							<span class="faint">—</span>
+						{:else}
+							<Money value={row.remaining ?? 0} />
+						{/if}
 					</td>
 				</tr>
 			{/each}
