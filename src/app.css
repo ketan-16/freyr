@@ -879,7 +879,8 @@ button.icon {
 	display: grid;
 	place-items: center;
 	min-height: 100dvh;
-	padding: var(--space-4);
+	/* The one screen in Freyr that gets --space-7 — see DESIGN.md § auth-shell. */
+	padding: var(--space-7) var(--space-4);
 }
 
 .auth-card {

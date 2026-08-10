@@ -11,7 +11,7 @@
 
 <div class="auth">
 	<form class="auth-card" method="POST" use:enhance>
-		<div class="mark"><FreyrMark size={64} /></div>
+		<div class="mark"><FreyrMark size={56} /></div>
 		<h1>Freyr</h1>
 		<p>Log in to continue.</p>
 		{#if form?.error}<p class="error">{form.error}</p>{/if}
