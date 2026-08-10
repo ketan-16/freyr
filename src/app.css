@@ -907,7 +907,11 @@ button.icon {
 	text-align: center;
 }
 
-.auth-card > p {
+/* The card's own sub-heading. `.error` is excluded by name: it is also a direct
+   child <p>, and this rule outranks `.error` on specificity, so without the
+   carve-out a failed login rendered muted grey and centred rather than as the
+   loss-coloured error DESIGN.md § error-text specifies. */
+.auth-card > p:not(.error) {
 	margin: 0 0 var(--space-4);
 	font-size: var(--t-body);
 	color: var(--ink-muted);
