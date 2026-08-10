@@ -1367,6 +1367,8 @@ git commit -m "perf(yearly): grouped month rollup and per-month yearly allocatio
 
 ### Task 7: Settings page — policy and promotions
 
+> **Superseded by Task 13 of `docs/superpowers/plans/2026-08-04-ui-redesign.md`, which is done.**
+
 **Files:**
 
 - Modify: `src/routes/settings/budget/+page.server.ts`
@@ -1620,6 +1622,10 @@ git commit -m "feat(settings): log promotions and edit the raise policy"
 
 ### Task 8: Yearly page — allocated, variance, effective rate, unallocated
 
+> **Superseded by Task 12 of `docs/superpowers/plans/2026-08-04-ui-redesign.md`, which is done.**
+> It shipped `variance` as **Remaining** and "effective rate" as **Allocated share** — see the
+> spec's § UI note.
+
 **Files:**
 
 - Modify: `src/routes/yearly/+page.server.ts`
@@ -1744,6 +1750,8 @@ git commit -m "feat(yearly): allocation, variance and unallocated income"
 ---
 
 ### Task 9: Documentation
+
+> **Superseded by Task 14 of `docs/superpowers/plans/2026-08-04-ui-redesign.md`, which is done.**
 
 **Files:**
 

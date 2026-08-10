@@ -161,9 +161,15 @@ export function updatePolicy(db, p: Policy): void; // triggers a rebuild
 export function yearlyAllocation(db, year): YearlyAllocation;
 ```
 
+Shipped split across three modules rather than one: `getPolicy`/`updatePolicy` sit in
+`promotions.ts` beside the projection they trigger, the `Policy` type and the fold live in
+`budget-policy.ts`, and `budgets.ts` keeps `yearlyAllocation`.
+
 `yearlyAllocation` sums per-month allocations so a mid-year promotion is handled correctly,
 and reports the **blended effective rate** per bucket (allocated ÷ income) as a derived
-figure — the number previously computed by hand in the workbook.
+figure — the number previously computed by hand in the workbook. (Shipped as
+`yearlyAllocation(periods, months, year)` — pure over already-fetched rows rather than taking
+`db` — and the figure is surfaced as **Allocated share**; see § UI.)
 
 ### `src/lib/server/ledger.ts` (extended)
 
@@ -208,6 +214,23 @@ One page, `/settings/budget`, three compact sections following DESIGN.md density
 **unallocated income** — income minus the three buckets. That figure is what exposed the 58%
 tracking shortfall in the 2022 workbook row, where an incomplete needs total read as a
 favourable variance.
+
+> **Shipped as (2026-08-10).** Two of those four columns were renamed during the UI redesign
+> and the spec's names no longer exist in the code:
+>
+> - **`variance` → `remaining`**, defined `allocated − actual`. `/monthly` already showed
+>   exactly that figure under that name, and the redesign ruled that one fact may not carry
+>   two labels across pages: a ₹10,000 overspend has to read identically wherever it appears.
+>   There is no `variance` field anywhere in the codebase. `null` when no period covered the
+>   year — no plan is a different fact from a plan of zero.
+> - **"effective rate" → "Allocated share"**, defined `allocated ÷ income` in basis points
+>   (`effectiveBP`). The arithmetic is the spec's; the label is not, because "rate" invited
+>   reading it as the share _spent_. `null` at zero income: there is no share of nothing, and
+>   `0` would read as "took no share".
+>
+> **Unallocated income** is computed (`YearlyAllocation.unallocated`) but deliberately not
+> printed as its own figure — it is identical to the page's Net tile (income − spent), and
+> the same number under two labels reads as two facts. A test guards the identity.
 
 ## Error handling
 

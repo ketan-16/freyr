@@ -15,6 +15,25 @@ TypeScript · SvelteKit 2 (server-rendered) · SQLite via Node's built-in `node:
 native addons, no database server, no per-OS builds. See [STACK.md](STACK.md) for the full
 rationale and [ARCHITECTURE.md](ARCHITECTURE.md) for how it's put together.
 
+## Screens
+
+- **Home** — the command centre, not a summary page. One hero figure (what's left this month,
+  or spend-so-far when there is nothing yet to be left of) with a delta against the same span
+  of days last month; the three buckets as meters that rescale to show an overspend rather
+  than clip at 100%; the same add form the ledger uses, inline, so a transaction lands
+  without leaving the page; then recent activity and goal progress.
+- **Ledger** — every transaction for a month, filterable by month/year/bucket, with the same
+  add form above the table it feeds.
+- **Monthly** — allocated vs actual vs remaining per bucket, with month-over-month deltas.
+  Left/right arrows step the month while the stepper has focus.
+- **Yearly** — three tiles (income, spent, net) over three tables: allocation vs actual with
+  each bucket's allocated share, a month-by-month grid, and the income split. Months no
+  budget period covers are named rather than silently allocated zero.
+- **Budget settings** — you edit the **raise policy and the promotion log**, not raw periods:
+  a base split, a raise split, and one row per raise. The budget periods are projected from
+  those, so a promotion re-weights every month after it automatically. A period can still be
+  typed by hand to correct a single month, and a hand-typed one is never overwritten.
+
 ## Interface
 
 Dense and keyboard-first: 29px table rows, 28px controls, tabular figures, and a month of

@@ -383,6 +383,46 @@ Rail icons: `layout-dashboard` (Home) · `list` (Ledger) · `calendar` (Monthly)
 
 ## Components
 
+Names below are CSS classes in `src/app.css` unless stated otherwise. There is no component library:
+appearance is a class, and a `.svelte` file exists only where the same _markup_ repeats across pages.
+
+### Svelte components
+
+`src/lib/components/` holds the seven that earned their file. Each owns markup or a rule that more
+than one page needs; none owns a color, and none re-derives a figure a page could get wrong.
+
+**`Money.svelte`** — One `money-cell` value. Applies the sign and zero convention through
+`formatCell` in `src/lib/format.ts`: zero is `—` in `--ink-faint`, an inflow is `+`-signed in
+`--gain`, an outflow is bare. The cell keeps its own `class="num amount"`; this owns the value alone,
+which is why the same figure reads identically on home, monthly, ledger and yearly.
+
+**`Delta.svelte`** — One `delta-cell`, from `current`, `previous` and an optional `lowerIsBetter`.
+Emits the arrow, the color class, the signed text and an optional trailing label. The arrow is
+`aria-hidden` and absent when flat.
+
+**`Meter.svelte`** — One `progress-meter` track, from the `Meter` value `src/lib/progress.ts`
+returns. Renders the fill and, over the cap, the excess segment; renders `—` when there is no
+allocation to measure against.
+
+**`EntryBar.svelte`** — The whole `entry-bar` form, shared by `/ledger` and home so the two cannot
+drift. Owns the direction-dependent fields (bucket/category/goal/location vs source), the
+`use:enhance` handler that refocuses the amount field after a submit, and the form-level
+`error-text`. It is a `<details open>` whose `<summary>` is hidden on desktop and becomes a 44px
+disclosure below `40rem`, so a phone can put the table first without eight fields pushing it
+off-screen.
+
+**`Icon.svelte`** — The Lucide subset as inline path data, one `<svg>` at 16px and 1.5px stroke on
+`currentColor`. The single gate on "one icon set, used consistently".
+
+**`FreyrMark.svelte`** — The mark, silhouette on `currentColor`. See § Brand & Logo.
+
+**`ThemeToggle.svelte`** — The `theme-toggle` form button.
+
+Presentation _rules_ — which color class, which arrow, which width — live in the pure modules
+`src/lib/format.ts` and `src/lib/progress.ts` rather than inside these components, because the test
+setup has no component environment: a pure function is the only layer a test can reach. See
+[ARCHITECTURE.md](ARCHITECTURE.md).
+
 ### Shell
 
 **`app-shell`** — `display: grid; grid-template-columns: auto 1fr`. Rail plus main. Full viewport
@@ -401,8 +441,10 @@ are, and it is the single most-used accent in the app.
 mark alone on the icon rail.
 
 **`topbar`** — Present on mobile only (below `40rem`), 44px, `--surface`, hairline bottom edge.
-Carries the page title and the theme toggle. On desktop the page `h1` does this job and no top bar
-exists.
+Carries the current nav item's label and the theme toggle. On desktop the rail shows where you are
+and no top bar exists. The label is a `<span>`, not a heading — the page keeps its own `<h1>`, and a
+second `h1` would break the one-per-page landmark rule. See Known Gaps for the duplication this
+costs.
 
 **`tabbar-mobile`** — Fixed bottom bar below `40rem`. `--rail-bg`, five 44px tab targets, icon over
 an 11px label. Active tab: `--rail-accent` icon and label plus a 2px top bar. Respects
@@ -430,18 +472,48 @@ application — everything else exists to support it.
 render bare (`₹1,250.50`), inflows render with an explicit `+` in `--gain`. Zero renders as `—` in
 `--ink-faint`, never as `₹0.00` — an em dash reads as "nothing here" far faster than a zero.
 
-**`delta-cell`** — A signed change. `--gain` with `▲` for positive, `--loss` with `▼` for negative,
-`--ink-faint` with `—` for flat. Arrow plus color plus sign: three redundant channels, so the meaning
-survives color blindness and grayscale printing. **This redundancy is mandatory** — color alone is
+**`delta-cell`** — A signed change across three redundant channels — arrow, color and sign — so the
+meaning survives color blindness and grayscale printing. **This redundancy is mandatory**; color is
 never the sole carrier of meaning.
+
+The arrow and the color are **independent, and answer different questions**:
+
+| Channel | Reports                    | Rule                                                                      |
+| ------- | -------------------------- | ------------------------------------------------------------------------- |
+| Arrow   | Which way the number moved | `▲` when it rose, `▼` when it fell. Never inverted, on any figure         |
+| Sign    | Which way the number moved | `+₹1,200` / `-₹1,200`, from `formatMoney`. Always agrees with the arrow   |
+| Color   | Whether that is good news  | `--gain` when good, `--loss` when bad. `lowerIsBetter` inverts this alone |
+
+So **a red `▲` is correct and expected.** Spending more is an upward movement and bad news at the
+same time: the Spent tile on home, monthly and yearly passes `lowerIsBetter`, which flips the color
+to `--loss` while the arrow keeps reporting that spending rose. An arrow that flipped with the color
+would claim the figure fell, which is false. Do not "fix" this.
+
+Flat (`current === previous`) is a single `—` in `--ink-faint` with **no arrow** — there is no
+direction to point, and the arrow would only repeat the dash. The arrow is `aria-hidden`; the signed
+text already says it out loud. An optional trailing label ("vs July") keeps `--ink-muted` in every
+state, because it is prose a reader must read and `--ink-faint` is a 3:1 decorative token.
+
+The rule lives in `delta()` in `src/lib/format.ts`, not in each call site.
 
 **`bucket-tag`** — A small `--r-1` tag naming a bucket (needs / wants / investments). `--t-caption`,
 uppercase, `--sunk` fill, `--ink-muted` text, 1px `--line`. Deliberately monochrome: buckets are
 categories, not directions, and coloring them would spend the semantic budget that gain/loss needs.
 
-**`progress-meter`** — A 4px track, `--r-full`, `--sunk` fill. Below 80% of allocation the bar is
-`--brand`; 80–100% it is `--accent`; over 100% the bar fills `--loss` and an overflow segment extends
-past the cap. Always paired with a text figure — the bar is a glance, the number is the truth.
+**`progress-meter`** — An 8rem × 4px track, `--r-full`, `--sunk` fill, `overflow: hidden`. Below 80%
+of allocation the fill is `--brand`; 80–100% it is `--accent`. Always paired with a text percentage,
+beside it or in the next column — the bar is a glance, the number is the truth. No allocation to
+measure against renders `—`, not an empty track.
+
+**Over the cap the track rescales rather than overflowing.** The fill takes `100 ÷ pct` of the
+track's width and an excess segment takes the rest, so the allocation and the overspend are both
+visible _inside_ the fixed width and their ratio is the real one. Fill is `--loss`; the excess is the
+same red at `opacity: 0.45`, split from the fill by a 1px `--surface` hairline so the 100% line is
+drawn rather than implied. At 200% the bar reads as half plan, half overspend.
+
+Nothing extends past the cap: a bar that grew beyond its track would either be clipped (an overspend
+looking exactly like on-budget) or force the column to resize per row. The arithmetic is
+`meter(actual, allocated)` in `src/lib/progress.ts` — one place, so a page cannot re-derive it wrong.
 
 **`goal-row`** — Goal name, a `progress-meter`, saved / target as `money-cell`s, and a tabular
 percentage. One line per goal.
@@ -457,7 +529,10 @@ decoration.
 carries a tooltip; if a number matters enough to inspect, it belongs in a table.
 
 **`empty-state`** — A single line of `--t-body` in `--ink-muted` inside the table body, spanning all
-columns. Not a centered illustration, not a card, not a call to action.
+columns (`<td class="empty" colspan="N">`). Not an illustration, not a call to action. Below `40rem`
+it takes the same one-card-per-row treatment as every other row and renders as one plain line with
+**no** `data-label` pseudo-label — it is the table's content, not a field with a missing value, so
+the reflow's hide-the-unlabelled rule carves it out by class.
 
 ### Forms
 
@@ -492,7 +567,17 @@ column.
 `--accent-text` text. For "no budget period covers this month". Informational, never celebratory.
 
 **`error-text`** — `--t-body` in `--loss`, directly below the offending control, tied by
-`aria-describedby`. Form-level errors sit above the submit.
+`aria-describedby`.
+
+**A form-level error sits below the form's controls, after the submit** — feedback follows the
+action. Two reasons it is not above: an `entry-bar` is a wrapping toolbar, so "above the submit" has
+no stable position (the submit's row moves with the field count and the viewport); and DOM order
+_is_ reading order, so a message that answers a submit belongs after the thing that was submitted.
+
+It carries `role="alert"` in every case. `use:enhance` never reloads the page, so an unannounced
+message is silent to a screen reader — the visible red line would be the only signal, which is
+exactly the color-alone failure this system forbids. Where focus returns to a specific control after
+the failure, that control points at the message with `aria-describedby`.
 
 ### Auth
 
@@ -567,6 +652,14 @@ sideways is useless. Each row becomes a card:
 Implemented with a CSS-only reflow — the same `<table>` markup switches to
 `display: block` with `data-label` pseudo-elements. Semantics and server rendering are untouched;
 there is no second mobile template to keep in sync.
+
+**`data-label` is the value's presence, not its name.** A cell whose value is absent omits the
+attribute in the template and the reflow hides it, so a card shows only the fields that carry
+information; a cell with `data-label=""` (the row action) is parked in the card's corner instead of
+claiming a line. Two consequences worth stating, because both have already been shipped wrong: any
+new cell that is not a labelled field — the `empty-state` line above all — needs its own carve-out or
+it vanishes on phones; and a label must never be added merely to keep a cell visible, because that
+prints an uppercase heading over a blank value.
 
 ### Touch
 
@@ -646,6 +739,13 @@ Non-negotiable, verified rather than assumed:
   favicons; a 32px PNG would need generating if that ever stops being true.
 - **No transaction-edit surface exists yet** (rows are add/delete only), so inline-edit and
   optimistic-update patterns are undocumented.
+- **The mobile top bar can repeat a page's name.** It carries the active nav label while the page
+  keeps its own `<h1>`, so a page whose heading matches its nav label shows the name twice below
+  `40rem` — `/settings/budget` reads "Budget" over "Budget"; `/ledger` reads "Ledger" over "Ledger".
+  The alternatives are worse: promoting the bar to the `h1` costs the one-`h1`-per-page landmark and
+  the page's own subtitle line, and dropping the bar leaves a phone with no persistent "where am I"
+  (the rail is hidden and the tab bar is at the far end of the screen). Accepted until a page needs a
+  heading that differs from its nav label for its own reasons.
 - **Print styles are not addressed.** A year-end statement print sheet would need its own pass.
 - **The categorical chart ramp is provisional** — `--c3` and `--c4` are named by intent rather than
   fixed hex, pending a real chart to tune against.
