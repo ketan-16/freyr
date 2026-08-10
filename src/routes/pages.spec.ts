@@ -355,6 +355,10 @@ describe('yearly budget coverage', () => {
 		// rate that was not in force.
 		const needs = data.allocation.rows.find((r: any) => r.bucket === 'needs');
 		expect(needs.allocated).toBe(450000);
+		// Nothing was spent, so remaining is the partial plan intact. It is the
+		// partial plan minus *every* month's spending, which is why the notice
+		// tells the reader this column reads low.
+		expect(needs.remaining).toBe(450000);
 	});
 
 	it('reports awaiting-income for a year with spending but none booked', () => {

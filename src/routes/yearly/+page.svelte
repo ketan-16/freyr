@@ -69,10 +69,16 @@
   supersedes the partial-coverage note.
 -->
 {#if data.allocation.coverage === 'none'}
+	<!--
+	  `none` means no month *with activity* is covered, which is not the same as
+	  "no period exists": a period dated later than every transaction in the year
+	  lands here too. The wording has to be true of both, and the remedy is an
+	  earlier effective date either way.
+	-->
 	<p class="notice">
-		No budget period covers {data.year} — set one in
-		<a href="/settings/budget">Budget settings</a>. The buckets below show what was spent; there is
-		no plan to measure it against.
+		No budget period covers any month with activity in {data.year}, so there is no plan to measure
+		the spending below against. Add one dated 1 January {data.year} or earlier in
+		<a href="/settings/budget">Budget settings</a>.
 	</p>
 {:else if data.awaitingIncome}
 	<p class="notice">
@@ -80,12 +86,20 @@
 		what was spent; targets appear once income lands.
 	</p>
 {:else if data.allocation.coverage === 'partial'}
+	<!--
+	  Allocated counts covered months only; Actual counts every month. Remaining
+	  is therefore a partial-year plan minus a whole-year spend, and reads lower
+	  than what was really left — far enough, on a big uncovered month, to paint
+	  an overspend that never happened. The arithmetic is not rescaled (that
+	  would invent a plan for months that never had one), so the notice has to
+	  say plainly which columns are affected and how.
+	-->
 	<p class="notice">
-		No budget period covers {uncovered}. Income and spending in
-		{data.allocation.uncoveredMonths.length === 1 ? 'that month are' : 'those months are'} still counted
-		below, but nothing is allocated against
-		{data.allocation.uncoveredMonths.length === 1 ? 'it' : 'them'}, so allocated and remaining cover
-		only the rest of the year.
+		No budget period covers {uncovered}. Spending in
+		{data.allocation.uncoveredMonths.length === 1 ? 'that month' : 'those months'} still counts toward
+		Actual, but Allocated covers only the rest of the year — so Remaining is understated and can show
+		an overspend that never happened, and Allocated share divides a partial plan by the whole year's income.
+		Backdate a period in <a href="/settings/budget">Budget settings</a> to cover the year.
 	</p>
 {/if}
 

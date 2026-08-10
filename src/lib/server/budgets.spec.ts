@@ -203,6 +203,30 @@ describe('yearlyAllocation', () => {
 		expect(y.rows.find((r) => r.bucket === 'needs')!.allocated).toBe(fromRupees(50000));
 	});
 
+	/**
+	 * The asymmetry the partial-coverage notice exists to explain: `allocated`
+	 * counts covered months only while `actual` accumulates unconditionally, so
+	 * `remaining` subtracts a whole year of spending from a partial plan and
+	 * reads lower than what was really left. Rescaling would invent a plan for
+	 * months that never had one, so the figures stand and the page says so.
+	 */
+	it('subtracts a whole year of spending from a partial plan', () => {
+		createPeriod(db, { effectiveFrom: '2025-05-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		const needs = yearlyAllocation(listPeriods(db), months, 2025).rows.find(
+			(r) => r.bucket === 'needs'
+		)!;
+		// September alone planned ₹50,000 and only ₹20,000 was spent against it,
+		// so ₹30,000 genuinely remained…
+		expect(needs.allocated).toBe(fromRupees(50000));
+		// …but January's uncovered ₹30,000 is still counted in actual…
+		expect(needs.actual).toBe(fromRupees(50000));
+		// …so remaining reads ₹0, "exactly on plan", which it was not.
+		expect(needs.remaining).toBe(0);
+		// And the share halves: a 50% budget over a year whose income is twice
+		// the covered part.
+		expect(needs.effectiveBP).toBe(2500);
+	});
+
 	it('reports full coverage when a period covers every month with data', () => {
 		createPeriod(db, { effectiveFrom: '2025-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
 		const y = yearlyAllocation(listPeriods(db), months, 2025);
