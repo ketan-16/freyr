@@ -24,3 +24,8 @@ Finances v2.xlsx
 
 # Test/browser artifacts
 .playwright-mcp/
+
+# Credentials — key material must never be committed
+cloud/
+*.key
+*.pem
