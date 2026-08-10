@@ -34,6 +34,10 @@ src/lib/server/ledger.ts       — transactions CRUD + validation, categories,
 src/lib/server/budgets.ts      — budget periods (basis points), activeFor, allocate,
                                  monthSummary (allocated/actual/remaining per bucket)
 src/lib/server/goals.ts        — goals & pots, locations, goalProgress (grouped, no N+1)
+src/lib/server/comparison.ts   — prior-period fold: same span of days when in progress, whole
+                                 once complete — shared by home, monthly (yearly to come)
+src/lib/server/txn-form.ts     — form values → transaction; shared create-action wrapper and
+                                 EntryBar's options, so neither can drift by page
 src/lib/server/registry.ts     — lendings + openLendingsTotal; insert helpers for
                                  insurance/purchases/cards/SIP/emergency (import targets)
 src/lib/server/backup.ts       — daily VACUUM INTO backups/freyr-YYYY-MM-DD.db, keep 30
