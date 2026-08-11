@@ -21,8 +21,9 @@
 		return page.url.pathname.startsWith(href) ? 'page' : undefined;
 	}
 
-	// The mobile top bar carries the page title; on desktop the page h1 does
-	// that job and no top bar exists (DESIGN.md § topbar).
+	// The mobile top bar carries the active nav item's label, not the page's own
+	// title — it answers "where am I", which on desktop the rail answers and no
+	// top bar exists to repeat (DESIGN.md § topbar).
 	const title = $derived(
 		[...nav, ...settings].find((item) => current(item.href) === 'page')?.label ?? 'Freyr'
 	);

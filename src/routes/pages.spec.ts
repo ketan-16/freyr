@@ -524,9 +524,10 @@ describe('budget settings page', () => {
 });
 
 describe('/settings/budget promotions', () => {
-	// A fresh database has a policy but no projection, so the base row this
-	// asserts only exists once something has written. See the report: closing
-	// that (a boot-time or migration-time rebuild) is out of this task's scope.
+	// Production gets this for free: `hooks.server.ts` rebuilds the projection
+	// once per process, straight after `migrate()`. A test database is opened by
+	// `testDb()` and never passes through the hook, so the base row this asserts
+	// has to be projected here.
 	it('loads policy, promotions and periods together', () => {
 		rebuildProjectedPeriods(db);
 		const data = budget.load(event('/settings/budget')) as any;
