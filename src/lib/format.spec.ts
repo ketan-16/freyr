@@ -20,6 +20,13 @@ describe('formatCell', () => {
 	it('does not stack a plus onto a negative', () => {
 		expect(formatCell(-125050, 'income')).toBe('-₹1,250.50');
 	});
+
+	// An overspent bucket is a bare negative: home, monthly and yearly all render
+	// Remaining through this, and the minus is the only thing carrying the sign.
+	it('renders an overspend bare, with a minus and no plus', () => {
+		expect(formatCell(-1000)).toBe('-₹10');
+		expect(formatCell(-1000, 'outflow')).toBe('-₹10');
+	});
 });
 
 describe('delta', () => {

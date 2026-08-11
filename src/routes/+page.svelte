@@ -25,6 +25,16 @@
 	 * is a fact either way.
 	 */
 	const hasAllocationBasis = $derived(s.period != null && !data.awaitingIncome);
+	/**
+	 * The headline is a sentence, not a table cell, so the zero convention needs
+	 * a word where `money-cell` uses a dash — "— left" is not English. The figure
+	 * still goes through `formatCell`, so `₹0` can never reach the page; zero
+	 * just becomes the sentence that says so.
+	 */
+	const leftLine = $derived(left === 0 ? 'Nothing left' : `${formatCell(left)} left`);
+	const spentLine = $derived(
+		data.spent === 0 ? 'Nothing spent yet' : `${formatCell(data.spent)} spent`
+	);
 </script>
 
 <svelte:head>
@@ -38,7 +48,7 @@
 
 {#if hasAllocationBasis}
 	<p class="hero">
-		<span class="figure">{formatMoney(left)} left</span>
+		<span class="figure">{leftLine}</span>
 		<!--
 		  The headline is what remains; the delta reports spending pace against
 		  the same span of days last month. Comparing "left" across two months
@@ -63,7 +73,7 @@
 	  here.
 	-->
 	<p class="hero">
-		<span class="figure">{formatMoney(data.spent)} spent</span>
+		<span class="figure">{spentLine}</span>
 		<Delta
 			current={data.spent}
 			previous={data.prior.spent}
