@@ -14,11 +14,12 @@
 	const typed = $derived(form?.values ?? {});
 
 	/**
-	 * The editable inverse of `parsePercentBP`: 2720 → "27.20". `formatBP` is for
-	 * reading (it carries the % sign); an input needs the bare figure back. Exact
-	 * for every integer basis-point value — no rounding happens here.
+	 * The editable inverse of `parsePercentBP`: 2720 → "27.20". `formatBP` owns
+	 * the arithmetic — it is integer division and remainder, where `bp / 100`
+	 * here was a float — and the only difference an input needs is the dropped
+	 * `%`, which `parsePercentBP` would not accept back.
 	 */
-	const pct = (bp: number) => (bp / 100).toFixed(2);
+	const pct = (bp: number) => formatBP(bp).replace('%', '');
 </script>
 
 <svelte:head>
