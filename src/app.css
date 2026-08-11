@@ -1212,6 +1212,15 @@ button.icon {
 		height: 44px;
 	}
 
+	/* The same rule, for the same reason: two 28px arrows a gap apart is the
+	   mis-tap this exists to prevent, and the toolbar row carries nothing else,
+	   so the height costs no density. Form controls stay 36px — DESIGN.md
+	   § Touch says why. */
+	.stepper a {
+		width: 44px;
+		height: 44px;
+	}
+
 	.kpi {
 		flex: 1 1 100%;
 	}
