@@ -95,11 +95,13 @@ Request → `hooks.server.ts` (db + session + guard) → `load`/action in `+page
 page. Forms POST to named actions and redirect (303) preserving filters; `use:enhance`
 makes that feel instant and refocuses the amount field for keyboard-first entry. Validation
 errors return `fail(400, { error, values })` so the form re-renders with what was typed. Every
-form renders that message below its own controls as a `role="alert"` — `use:enhance` never
-reloads, so an unannounced message would be silent — and where focus returns to a control
-(the entry bar's amount field), that control points at it with `aria-describedby`. Pages with
-several forms tag the failure (`failed: 'addPromotion'`) so only the one that failed
-re-renders it.
+form renders that message as a `role="alert"` — `use:enhance` never reloads, so an unannounced
+message would be silent — below its own controls, so feedback follows the action. The one
+exception is a row delete: its form is a single button inside a `<td>`, with no control the
+message could sit under and no room in the row for it, so `/settings/budget` renders it above the
+table it belongs to. Where focus returns to a control (the entry bar's amount field), that control
+points at the message with `aria-describedby`. Pages with several forms tag the failure
+(`failed: 'addPromotion'`) so only the one that failed re-renders it.
 
 ## Excel import design
 

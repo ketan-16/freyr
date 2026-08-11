@@ -383,8 +383,50 @@ Rail icons: `layout-dashboard` (Home) · `list` (Ledger) · `calendar` (Monthly)
 
 ## Components
 
-Names below are CSS classes in `src/app.css` unless stated otherwise. There is no component library:
-appearance is a class, and a `.svelte` file exists only where the same _markup_ repeats across pages.
+Names below are this system's **vocabulary** — the handle for saying which component you mean — and
+not, with a handful of exceptions, selectors. `src/app.css` writes most of them shorter, and several
+are element or compound selectors rather than a class at all. The names are what a review, a commit
+message and the Iteration Guide use; the table is how you find the CSS. Renaming the stylesheet to
+match would touch every template for no gain, so the mapping is written down instead.
+
+There is no component library: appearance is a class, and a `.svelte` file exists only where the same
+_markup_ repeats across pages (those names are real paths under `src/lib/components/`).
+
+| Component            | Styled in `src/app.css` by                                                               |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| `app-shell`          | `.shell`                                                                                 |
+| `rail`               | `.rail` — literal, with `.rail-section`, `.rail-spacer`, `.rail-foot`, `.rail-btn`       |
+| `rail-item`          | `.rail-item` — literal                                                                   |
+| `rail-brand`         | `.rail-brand` — literal, plus `.wordmark`                                                |
+| `topbar`             | `.topbar` — literal, label in `.topbar-title`                                            |
+| `tabbar-mobile`      | `.tabbar`                                                                                |
+| `theme-toggle`       | no class of its own — `ThemeToggle.svelte`; `.rail-btn` in the rail, bare above it       |
+| `kpi-strip`          | `.kpis`                                                                                  |
+| `kpi-tile`           | `.kpi`, with `.label` and `.value`                                                       |
+| `data-table`         | the bare `table` / `th` / `td` elements; `.table-wrap` is the scroller around it         |
+| `money-cell`         | `td.num` and `td.amount` on the cell; `Money.svelte` for the value (`.pos` / `.faint`)   |
+| `delta-cell`         | `.delta`, with `.pos` / `.neg` / `.flat`                                                 |
+| `bucket-tag`         | `.tag`                                                                                   |
+| `progress-meter`     | `.meter` (+ `.warn` / `.over`, `.fill`, `.over-seg`); `.meter-cell` pairs it with `.pct` |
+| `goal-row`           | no class — a `<tr>` in home's goals table                                                |
+| `month-stepper`      | `.stepper`, label in `.stepper .current`                                                 |
+| `filter-bar`         | `.toolbar` — a `<form>` on `/ledger`, a `<div>` on `/monthly`                            |
+| `sparkline`          | not built — see Known Gaps                                                               |
+| `empty-state`        | `.empty`; the phone layout adds `tbody td.empty`                                         |
+| `entry-bar`          | `.entry`, inside the `.entry-wrap` disclosure                                            |
+| `field`              | `.field` — literal                                                                       |
+| `input-text`         | the `input` element                                                                      |
+| `select`             | the `select` element                                                                     |
+| `input-date`         | `input[type='date']`                                                                     |
+| `input-money`        | `input.money`                                                                            |
+| `button-primary`     | `button.primary`                                                                         |
+| `button-secondary`   | the `button` element's own style                                                         |
+| `button-ghost`       | `button.ghost`                                                                           |
+| `button-danger-icon` | `button.icon`                                                                            |
+| `notice`             | `.notice` — literal                                                                      |
+| `error-text`         | `.error`                                                                                 |
+| `auth-shell`         | `.auth`                                                                                  |
+| `auth-card`          | `.auth-card` — literal                                                                   |
 
 ### Svelte components
 
@@ -450,7 +492,8 @@ costs.
 an 11px label. Active tab: `--rail-accent` icon and label plus a 2px top bar. Respects
 `env(safe-area-inset-bottom)`.
 
-**`theme-toggle`** — A form button posting to `?/theme`. Sun icon in dark mode, moon in light. Label
+**`theme-toggle`** — A form button posting to `/theme`, a `+server.ts` endpoint that sets the cookie
+and redirects back. Sun icon in dark mode, moon in light. Label
 is `aria-label="Switch to light theme"` / `"Switch to dark theme"` — the icon shows the destination,
 the label says it out loud.
 
@@ -519,8 +562,10 @@ looking exactly like on-budget) or force the column to resize per row. The arith
 percentage. One line per goal.
 
 **`month-stepper`** — `‹ June 2026 ›` with the current month in `--t-title` between two icon buttons.
-Keyboard: left/right arrows step when the group has focus. The label is a real heading, not a
-decoration.
+Keyboard: left/right arrows step when the group has focus. The label is a `<span>`, not a heading —
+the page's own `<h1>` names the screen, a second one would break the one-per-page landmark rule, and
+an `<h2>` here would sit above the page's real `<h2>` and invert the outline. The group carries
+`role="group"` with an `aria-label` instead, which is what actually names it for a screen reader.
 
 **`filter-bar`** — A `GET` form of selects, `--space-2` gaps, wrapping. Auto-submits on change with a
 `<noscript>` submit button as the fallback. No "Apply" button when JS is on.
@@ -573,6 +618,10 @@ column.
 action. Two reasons it is not above: an `entry-bar` is a wrapping toolbar, so "above the submit" has
 no stable position (the submit's row moves with the field count and the viewport); and DOM order
 _is_ reading order, so a message that answers a submit belongs after the thing that was submitted.
+
+The one exception is a **row delete**, whose form is a single button inside a `<td>`: there is no
+control it could sit under, and a paragraph in a table row is not a place a message can go. It
+renders above the table instead — still the nearest position in reading order that exists.
 
 It carries `role="alert"` in every case. `use:enhance` never reloads the page, so an unannounced
 message is silent to a screen reader — the visible red line would be the only signal, which is
@@ -663,7 +712,17 @@ prints an uppercase heading over a blank value.
 
 ### Touch
 
-- Every target below `40rem` is ≥ 44×44px, including the row delete control.
+Stated per control class and **measured against `src/app.css`**, not asserted as a blanket figure:
+
+- **Targets that are small in both axes are ≥ 44×44px below `40rem`.** The row delete
+  (`button.icon`, 20px in a desktop row) and the month-stepper arrows both go to 44×44; the tab bar's
+  tabs are 52 tall and a fifth of the viewport; the `entry-bar` disclosure is 44 tall and full width.
+- **Text inputs, selects and buttons are 36px tall, not 44** — `input, select, button { height: 36px }`,
+  up from the 28px `--control-h` that desktop uses. They are full-width or text-labelled, so the
+  target is a wide band and only the height is under 44: that clears WCAG 2.2 AA's 24×24 minimum with
+  room to spare, where 44×44 is the AAA figure. Raising it would spend 8px per control on the densest
+  screens in the app — `entry-bar` stacks eight of them on a phone — to enlarge targets nobody misses.
+  A deliberate, measured exception; re-measure before changing that rule, and change the doc with it.
 - The bottom tab bar reserves `env(safe-area-inset-bottom)`.
 - Hover styles are wrapped in `@media (hover: hover)` so touch devices don't get sticky hover states.
 
