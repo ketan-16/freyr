@@ -14,9 +14,20 @@
 	const prev = $derived(prevMonth(s.year, s.month));
 	const next = $derived(nextMonth(s.year, s.month));
 	const spent = $derived(s.rows.reduce((t, r) => t + r.actual, 0));
-	const left = $derived(s.income - spent);
+	// One source for the tile and the table beneath it, exactly as home folds it:
+	// income − spent is a second derivation, and the two disagree by a paisa the
+	// moment `mulBP`'s rounding does not sum the shares back to income.
+	const left = $derived(s.rows.reduce((t, r) => t + (r.remaining ?? 0), 0));
 	const prevHref = $derived(`/monthly?year=${prev.year}&month=${prev.month}`);
 	const nextHref = $derived(`/monthly?year=${next.year}&month=${next.month}`);
+	/**
+	 * Whether there is anything for the tile to be "left" of: a period to
+	 * allocate by, and income for it to allocate. Missing either, every row's
+	 * remaining is null or 0 − actual and the fold is a figure nobody planned —
+	 * so the tile says nothing, the way the rows below it already do. Home gates
+	 * its headline on the same two facts.
+	 */
+	const hasAllocationBasis = $derived(s.period != null && !data.awaitingIncome);
 
 	/**
 	 * Arrow-key stepping, scoped to the group (DESIGN.md § month-stepper). It
@@ -75,14 +86,14 @@
 		/>
 	</div>
 	<!--
-	  With no income booked there is nothing to be left of: income − spent is
-	  merely −spent, which is not an overspend. Say nothing yet rather than paint
-	  the month red before payday.
+	  With no period covering the month, or no income booked, there is nothing to
+	  be left of — every row's Allocated and Remaining is a dash, and so is this.
+	  A figure here above a table of dashes was the contradiction being fixed.
 	-->
 	<div class="kpi">
 		<div class="label">Left</div>
-		<div class="value {!data.awaitingIncome && left < 0 ? 'neg' : ''}">
-			{#if data.awaitingIncome}<span class="faint">—</span>{:else}<Money value={left} />{/if}
+		<div class="value {hasAllocationBasis && left < 0 ? 'neg' : ''}">
+			{#if hasAllocationBasis}<Money value={left} />{:else}<span class="faint">—</span>{/if}
 		</div>
 	</div>
 </div>

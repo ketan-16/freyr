@@ -140,6 +140,46 @@ describe('monthly page', () => {
 		expect(data.summary.period).toBeNull();
 	});
 
+	// The Left tile folds the rows' remaining rather than computing income −
+	// spent, so a month no period covers has nothing to fold and the tile shows
+	// a dash. Income is booked here on purpose: the awaiting-income flag alone
+	// says nothing is wrong, which is how "Left ₹3,000" once printed above a
+	// table whose every Allocated and Remaining cell was a dash.
+	it('leaves a month no budget period covers without an allocation basis', () => {
+		createPeriod(db, { effectiveFrom: '2026-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
+		createTransaction(db, {
+			date: '2025-11-02',
+			amountPaise: 300000,
+			direction: 'income',
+			incomeSource: 'job'
+		});
+
+		const data = monthly.load(event('/monthly?year=2025&month=11')) as any;
+		expect(data.summary.period).toBeNull();
+		expect(data.awaitingIncome).toBe(false);
+		expect(data.summary.rows.every((r: any) => r.remaining === null)).toBe(true);
+		expect(data.summary.rows.reduce((t: number, r: any) => t + (r.remaining ?? 0), 0)).toBe(0);
+	});
+
+	// The other half of the same rule: three roundings that each fall short leave
+	// the shares a paisa under income, so income − spent and the sum of the rows
+	// are different numbers. The tile folds the rows, so it agrees with them.
+	it('allocates a paisa short of income when every share rounds down', () => {
+		createPeriod(db, { effectiveFrom: '2025-01-01', needsBP: 4500, wantsBP: 3000, investBP: 2500 });
+		createTransaction(db, {
+			date: '2026-07-01',
+			amountPaise: 100001,
+			direction: 'income',
+			incomeSource: 'job'
+		});
+
+		const data = monthly.load(event('/monthly?year=2026&month=7')) as any;
+		const rows = data.summary.rows as { allocated: number; remaining: number }[];
+		expect(data.summary.income).toBe(100001);
+		expect(rows.reduce((t, r) => t + r.allocated, 0)).toBe(100000);
+		expect(rows.reduce((t, r) => t + r.remaining, 0)).toBe(100000);
+	});
+
 	it('reports awaiting-income for a month with no income booked', () => {
 		createPeriod(db, { effectiveFrom: '2020-01-01', needsBP: 5000, wantsBP: 3000, investBP: 2000 });
 		createTransaction(db, {
