@@ -14,12 +14,18 @@ Freyr is a **self-hosted personal ledger for daily power use**. Not a marketing 
 terminal — a tool its single user opens several times a day to type a number and read a table. Every
 decision below serves one sentence: **more truthful information on screen, legibly, without noise.**
 
-The atmosphere is **warm paper and deep evergreen**. The canvas is a slightly warm off-white
-(`--canvas` #FBFAF8) rather than pure white — an accountant's ledger page, not a dashboard. Against
-it sits a **deep evergreen rail** (`--rail-bg` #2C4A3B) carrying navigation. The brand green is dark
-and desaturated on purpose: it reads as _furniture_, never as a value. That distinction is the
-keystone of the whole system, because in a finance app green already means something — gain — and a
-brand green that competes with a gain green makes every screen ambiguous.
+The atmosphere is **cool neutral paper and near-black evergreen**. The canvas is a light neutral
+grey (`--canvas` #F7F8FA) with white cards on it; the rail is a near-black with a green cast
+(`--rail-bg` #14201B). The brand green is deep and slightly teal-leaning: it reads as _furniture_,
+never as a value. That distinction is the keystone of the whole system, because in a finance app
+green already means something — gain — and a brand green that competes with a gain green makes
+every screen ambiguous.
+
+> **Superseded: the warm-paper ramp.** Until 2026-08-17 the surfaces were warm — `--canvas`
+> #FBFAF8, `--sunk` #F3F1EC, `--line` #E3E0D9 — argued for as an accountant's ledger page. On
+> screen it did not read as warm, it read as _aged_: beige-on-beige against a desaturated forest
+> green is the loudest period signal a UI can carry, and it dated the whole product. The neutrals
+> above replace it. The evergreen brand and the lantern amber are kept; the paper is not.
 
 The single accent is **lantern amber** (`--accent` #C1730E), lifted from the flame in the logo. It is
 deliberately scarce. Amber marks exactly three things: the active navigation item, the keyboard focus
@@ -38,13 +44,20 @@ Theme resolves server-side from a cookie, so there is no flash of the wrong them
   what makes it legible.
 - **Brand green never means "up."** `--brand` is chrome: rail, primary buttons, links. `--gain` is a
   brighter, more saturated green reserved for money. They are never interchangeable.
-- **Density over comfort.** 28px table rows, 28px controls, a 4px spacing base. The whole point is
-  fitting a month of transactions on one screen.
-- **Flat, hairline-separated.** No shadows except on dialogs. Depth comes from a 1px hairline and a
-  1.04:1 surface step, not elevation theatre.
+- **Density over comfort, with room to read.** 32px table rows, 32px controls, a 4px spacing base.
+  Still a month of transactions on one screen — but 28px rows with 4px of padding read as cramped,
+  and cramped is half of what made the old screens feel lifeless.
+- **Hierarchy is size and weight, never case.** No uppercase tracked micro-labels. They were doing
+  the work at three levels at once — section head, table header, tile label — which is precisely
+  why nothing outranked anything else and every screen read as one field of small grey text.
+- **Hairlines first, one shadow for cards.** `--shadow-card` is two nearly-transparent stacked
+  shadows that seat a card on the canvas; `--shadow-raised` belongs to dialogs. That is the entire
+  depth budget. No glassmorphism, no gradient surfaces, no coloured shadows.
 - **One typeface, tabular numerals.** No custom fonts, no CDN, no font files. The system UI stack with
   `font-variant-numeric: tabular-nums` on every figure.
-- **Radius stays small.** 3px controls, 4px cards, 6px dialogs. Nothing is a pill except badges.
+- **Radius is soft, not round.** 6px controls, 8px cards, 12px dialogs, full-round only on tags and
+  the meter. Large uniform rounding is still the strongest tell of generic AI-generated UI; 3px
+  corners were the opposite failure and read as 2011 chrome.
 - **Every color pair is contrast-verified.** Body text ≥ 4.5:1, UI boundaries and focus rings ≥ 3:1,
   in both themes, on all three background surfaces. Ratios are recorded per token below.
 
@@ -57,6 +70,14 @@ Theme resolves server-side from a cookie, so there is no flash of the wrong them
 | Yellow does all brand voltage           | Green does brand, amber does attention | A finance app cannot afford accent/semantic ambiguity in the green channel |
 | 80px section rhythm                     | 16–24px section rhythm                 | Product-only, density-first; there are no editorial bands                  |
 | Documents Default + Active only         | Also documents hover, focus, disabled  | Freyr is keyboard- and pointer-driven; hover and focus are load-bearing    |
+
+**How to tell when this document is going stale.** The failure mode is not a wrong hex value, it is
+a system that keeps every rule it wrote down and stops looking current anyway. The 2026-08-17 pass
+was prompted by exactly that: the layout had just been rebuilt and the screens still read as a 2011
+admin panel, because the daters were in the tokens — beige surfaces, a four-size type ramp with no
+gaps in it, 3px radii, uppercase tracked labels on six components, and no elevation at all. None of
+those violated a rule here; several were rules here. If the app looks dated, suspect this document
+before suspecting its implementation.
 
 ---
 
@@ -143,52 +164,57 @@ three.
 
 | Token           | Light     | Dark      | Use                                                                                                                                                               |
 | --------------- | --------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--canvas`      | `#FBFAF8` | `#0E1411` | Page floor. Warm off-white / near-black with a green cast — never pure white, never pure black                                                                    |
-| `--surface`     | `#FFFFFF` | `#151E19` | Cards, tables, the entry bar, dialogs                                                                                                                             |
-| `--sunk`        | `#F3F1EC` | `#0F1713` | Table headers, inset wells, disabled fields                                                                                                                       |
-| `--line`        | `#E3E0D9` | `#24312A` | Decorative hairlines — table dividers, section rules                                                                                                              |
-| `--line-strong` | `#8D8A81` | `#5E7366` | **Control boundaries** — input, select and button edges. Held to 3:1 (worst case light 3.06, dark 3.35) because a control's edge is meaningful UI, not decoration |
+| `--canvas`      | `#F7F8FA` | `#0D1117` | Page floor. Cool light grey / cool near-black — never pure white, never pure black                                                                                |
+| `--surface`     | `#FFFFFF` | `#151B23` | Cards, tables, the entry bar, dialogs                                                                                                                             |
+| `--sunk`        | `#EFF1F4` | `#11171E` | Table headers, inset wells, disabled fields                                                                                                                       |
+| `--line`        | `#E2E5EA` | `#262E38` | Decorative hairlines — table dividers, section rules                                                                                                              |
+| `--line-strong` | `#7E8691` | `#5C6773` | **Control boundaries** — input, select and button edges. Held to 3:1 (worst case light 3.25, dark 3.00) because a control's edge is meaningful UI, not decoration |
 
-Canvas-to-surface separation is deliberately slight — **1.04:1 light, 1.09:1 dark**. Cards are found by
-their hairline, not by a brightness jump.
+Canvas-to-surface separation is **1.06:1 light, 1.09:1 dark** — slight, but now doing real work: a
+card is found by the step _and_ its hairline _and_ `--shadow-card`, which is what lets a panel
+outrank the table inside it without any of the three shouting.
 
 ### Text
 
 | Token         | Light     | Dark      | Worst-case ratio | Use                                                                           |
 | ------------- | --------- | --------- | ---------------- | ----------------------------------------------------------------------------- |
-| `--ink`       | `#14201A` | `#E6EDE8` | 14.87 / 14.33    | Default text, figures                                                         |
-| `--ink-muted` | `#5C6862` | `#94A29A` | 5.15 / 6.41      | Labels, table headers, secondary meta. **Passes 4.5 — safe for real content** |
-| `--ink-faint` | `#828C85` | `#6A7972` | 3.08 / 3.73      | Placeholder, disabled, decorative only. **Never body text**                   |
+| `--ink`       | `#0F1419` | `#E6EAF0` | 16.36 / 14.34    | Default text, figures                                                         |
+| `--ink-muted` | `#5A626C` | `#9AA4B2` | 5.46 / 6.87      | Labels, table headers, secondary meta. **Passes 4.5 — safe for real content** |
+| `--ink-faint` | `#767E89` | `#6E7885` | 3.63 / 3.87      | Placeholder, disabled, decorative only. **Never body text**                   |
 
 ### Brand & accent
 
 | Token           | Light     | Dark      | Worst-case ratio                  | Use                                                                                                               |
 | --------------- | --------- | --------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `--brand`       | `#2C4A3B` | `#64A181` | 8.65 / 5.65                       | Links, primary button fill, rail. Chrome — never a value                                                          |
-| `--brand-hover` | `#223B2F` | `#78B394` | —                                 | Hover/press on brand fills                                                                                        |
-| `--brand-tint`  | `#E9EFEA` | `#1A2A22` | 8.37 / 4.98 (brand on tint)       | Selected rows, quiet callouts                                                                                     |
-| `--accent`      | `#C1730E` | `#E7A34A` | 3.25 / 7.90                       | **Fills, bars, rings, icons only.** In light mode this is a 3:1 non-text token — it may not be used for body text |
-| `--accent-text` | `#8F540A` | `#E7A34A` | 5.41 / 7.90                       | The text-safe amber. Use whenever amber must be _read_                                                            |
-| `--accent-tint` | `#FBF1E0` | `#2A2117` | 5.45 / 7.33 (accent-text on tint) | Caution callout backgrounds                                                                                       |
+| `--brand`       | `#0B6248` | `#3FB98A` | 6.50 / 7.02                       | Links, primary button fill, meter fill, rail. Chrome — never a value                                              |
+| `--brand-hover` | `#084E39` | `#55C99B` | —                                 | Hover/press on brand fills                                                                                        |
+| `--brand-tint`  | `#E2F1EA` | `#14312A` | 6.31 / 5.67 (brand on tint)       | Selected rows, quiet callouts                                                                                     |
+| `--accent`      | `#C2670A` | `#E5A03F` | 3.54 / 7.78                       | **Fills, bars, rings, icons only.** In light mode this is a 3:1 non-text token — it may not be used for body text |
+| `--accent-text` | `#97520A` | `#E5A03F` | 5.26 / 7.16                       | The text-safe amber. Use whenever amber must be _read_                                                            |
+| `--accent-tint` | `#FDF1E1` | `#2A2016` | 5.34 / 7.16 (accent-text on tint) | Caution callout backgrounds                                                                                       |
 
-> **The one amber trap.** In light mode `--accent` (#C1730E) reaches only 3.67:1 on white. That clears
-> the 3:1 bar for a focus ring or a progress bar, and fails the 4.5:1 bar for text. The system carries
-> two amber tokens rather than compromising one: `--accent` for things you _see_, `--accent-text` for
-> things you _read_. In dark mode both resolve to the same value.
+> **The one amber trap.** In light mode `--accent` reaches 4.01:1 on white but only 3.54:1 on
+> `--sunk`. That clears the 3:1 bar for a focus ring or a progress bar and fails the 4.5:1 bar for
+> text. The system carries two amber tokens rather than compromising one: `--accent` for things you
+> _see_, `--accent-text` for things you _read_. In dark mode both resolve to the same value.
 
 ### Money semantics
 
 | Token    | Light     | Dark      | Worst-case ratio | Use                                    |
 | -------- | --------- | --------- | ---------------- | -------------------------------------- |
-| `--gain` | `#147E3B` | `#34C77B` | 4.56 / 7.80      | Income, positive delta, under budget   |
-| `--loss` | `#BE2E29` | `#F0656B` | 5.15 / 5.50      | Overspend, negative delta, over budget |
+| `--gain` | `#0E7A3C` | `#3DD68C` | 4.80 / 9.23      | Income, positive delta, under budget   |
+| `--loss` | `#C02A2A` | `#F0656B` | 5.15 / 5.59      | Overspend, negative delta, over budget |
 
 Both are **text colors**. Neither may fill a row, a cell, or a card. A gain is a green _number_ on a
 normal surface — this keeps a dense table readable and stops the eye from parsing color blocks as
 groups.
 
-`--gain` and `--brand` differ by roughly 25 points of lightness and a full step of saturation. That
-gap is the system working; do not narrow it.
+**`--brand` and `--gain` are separated on two axes, and both are load-bearing.** They sit
+**1.35:1 apart in luminance (light) / 1.31:1 (dark)**, and `--brand` is measurably more teal while
+`--gain` is a purer green. The pair has to survive the worst case in the app: yearly's _By month_
+table puts brand-coloured month links in one column and gain-coloured income figures in the next.
+Brightening the brand so it "shows up more" is the obvious way to break this — it was considered
+and rejected for exactly that reason. Verify both axes before touching either token.
 
 ### Rail (chrome)
 
@@ -198,23 +224,24 @@ dark green, not amber on paper.
 
 | Token           | Light     | Dark      | Ratio vs `--rail-bg` | Use                                                           |
 | --------------- | --------- | --------- | -------------------- | ------------------------------------------------------------- |
-| `--rail-bg`     | `#2C4A3B` | `#16241D` | —                    | Rail fill                                                     |
-| `--rail-fg`     | `#EAF0EC` | `#DCE6DF` | 8.45 / 12.60         | Nav labels                                                    |
-| `--rail-muted`  | `#A6BEB0` | `#8CA396` | 4.94 / 5.98          | Section headings, the logout line                             |
-| `--rail-accent` | `#E7A34A` | `#E7A34A` | 4.53 / 7.46          | Active-item indicator. **The dark-ramp amber in both themes** |
-| `--rail-focus`  | `#FFFFFF` | `#E7A34A` | 9.77 / 7.46          | Focus ring inside the rail                                    |
+| `--rail-bg`     | `#14201B` | `#0F1613` | —                    | Rail fill                                                     |
+| `--rail-fg`     | `#E8EDEA` | `#E3EAE6` | 14.16 / 15.01        | Nav labels                                                    |
+| `--rail-muted`  | `#9BA8A1` | `#93A29B` | 6.80 / 6.89          | Section headings, the logout line                             |
+| `--rail-accent` | `#F0A94C` | `#F0A94C` | 8.37 / 9.16          | Active-item indicator. **The dark-ramp amber in both themes** |
+| `--rail-focus`  | `#FFFFFF` | `#F0A94C` | 16.77 / 9.16         | Focus ring inside the rail                                    |
 
-In dark mode the rail sits only 1.16:1 from the canvas — intentionally. It is separated by a 1px
-`--line` edge, not by brightness. Surface boundaries are decorative and carry no WCAG bar; control
-boundaries do, and use `--line-strong`.
+The rail is a **near-black with a green cast** in both themes, not the mid-green it used to be in
+light mode. A mid-tone coloured sidebar is a period tell of its own; a near-black one is what makes
+the neutral canvas beside it read as bright and current. The evergreen is still there — it is the
+cast in the black, and the mark on top of it.
 
 ### State
 
 | Token        | Light     | Dark      | Use                                                                  |
 | ------------ | --------- | --------- | -------------------------------------------------------------------- |
-| `--focus`    | `#C1730E` | `#E7A34A` | 2px focus ring, 1px offset. Scoped to `--rail-focus` inside the rail |
-| `--hover`    | `#F3F1EC` | `#1B2620` | Row and item hover                                                   |
-| `--selected` | `#E9EFEA` | `#1A2A22` | Selected row (= `--brand-tint`)                                      |
+| `--focus`    | `#C2670A` | `#E5A03F` | 2px focus ring, 1px offset. Scoped to `--rail-focus` inside the rail |
+| `--hover`    | `#F1F3F5` | `#1B222B` | Row and item hover                                                   |
+| `--selected` | `#E2F1EA` | `#14312A` | Selected row (= `--brand-tint`)                                      |
 
 ### Charts
 
@@ -254,15 +281,20 @@ exactly as a dedicated numeric face would. The rule survives; the font files don
 
 | Token         | rem    | @16px | Weight | Line height | Tracking | Use                                                                      |
 | ------------- | ------ | ----- | ------ | ----------- | -------- | ------------------------------------------------------------------------ |
-| `--t-hero`    | 1.625  | 26px  | 600    | 1.15        | −0.01em  | The single headline figure on a screen — net worth, month total. Tabular |
-| `--t-figure`  | 1.25   | 20px  | 600    | 1.2         | −0.005em | KPI tile values. Tabular                                                 |
-| `--t-title`   | 1.0625 | 17px  | 600    | 1.3         | 0        | Page `h1`                                                                |
-| `--t-section` | 0.8125 | 13px  | 600    | 1.3         | 0.06em   | `h2`, uppercase, `--ink-muted`                                           |
+| `--t-hero`    | 1.75   | 28px  | 680    | 1.15        | −0.025em | The single headline figure on a screen — net worth, month total. Tabular |
+| `--t-figure`  | 1.375  | 22px  | 650    | 1.2         | −0.015em | KPI tile values. Tabular                                                 |
+| `--t-title`   | 1.25   | 20px  | 650    | 1.3         | −0.01em  | Page `h1`                                                                |
+| `--t-section` | 0.9375 | 15px  | 600    | 1.3         | −0.005em | `h2` and `panel-head`. Sentence case, `--ink`                            |
 | `--t-body`    | 0.875  | 14px  | 400    | 1.45        | 0        | Default running text, table cells                                        |
 | `--t-num`     | 0.875  | 14px  | 500    | 1.45        | 0        | Money in tables. Tabular, right-aligned                                  |
-| `--t-control` | 0.8125 | 13px  | 400    | 1.2         | 0        | Inputs, selects, buttons                                                 |
-| `--t-label`   | 0.75   | 12px  | 500    | 1.3         | 0.05em   | Field labels, `th`. Uppercase, `--ink-muted`                             |
-| `--t-caption` | 0.6875 | 11px  | 400    | 1.3         | 0        | Timestamps, row meta, import markers                                     |
+| `--t-control` | 0.875  | 14px  | 500    | 1.2         | 0        | Inputs, selects, buttons                                                 |
+| `--t-label`   | 0.75   | 12px  | 500    | 1.3         | 0        | Field labels, `th`, tile labels. Sentence case, `--ink-muted`            |
+| `--t-caption` | 0.75   | 12px  | 500    | 1.3         | 0        | Tags, panel meta, row meta                                               |
+
+The ramp is deliberately **wider than it was**. The previous scale ran 26 / 20 / 17 / 14 / 13 / 12 /
+11 — four of those sizes within 3px of each other — so below the hero there was no hierarchy left
+and every screen flattened into one grey field. 28 / 22 / 20 / 15 / 14 / 12 gives a page head, a
+section head and a tile figure that each outrank the body without anything shouting.
 
 ### Rules
 
@@ -270,10 +302,15 @@ exactly as a dedicated numeric face would. The rule survives; the font files don
   single proportional column breaks the scan.
 - **Money is right-aligned. Labels are left-aligned.** Always. The decimal point is the alignment
   axis in a dense table.
-- **Weight, not size, carries hierarchy.** The gap between `--t-body` and `--t-title` is 3px; the gap
-  between 400 and 600 is what the eye actually reads. This is what keeps density without shouting.
+- **Size and weight together carry hierarchy — never case.** No `text-transform: uppercase` with
+  tracking on a label, anywhere. That treatment appeared on `h2`, `th`, `.kpi .label`, `.tag`,
+  `.rail-section` and the phone card labels simultaneously, which is six things all shouting at the
+  same pitch and none of them ranking.
 - **Maximum two type sizes per component.** A KPI tile is `--t-label` + `--t-figure`. A table row is
   `--t-body` + `--t-num`. If a third size seems necessary, the component is doing too much.
+- **Negative tracking on the large sizes only.** Headline figures tighten (−0.025em at 28px);
+  body and labels never do. Tracking out a small label is what the old scale did and it is the
+  single most dating typographic habit in the system.
 - **No italics anywhere.** Not for emphasis, not for meta. Use `--ink-muted`.
 
 ---
@@ -302,15 +339,24 @@ is a table with a heading above it.
 
 | Element                       | Height          | Notes                                                                |
 | ----------------------------- | --------------- | -------------------------------------------------------------------- |
-| Table row                     | 28px + hairline | 20px line box + `--space-1` top/bottom → 29px pitch                  |
-| Table header                  | 28px + hairline | `--sunk`, sticky                                                     |
-| Control (input/select/button) | 28px            | The system's baseline control height                                 |
-| Row-level icon button         | 20px            | **Not** a control — a 28px button in a padded cell forces a 36px row |
-| Rail item                     | 30px            | Slightly taller — it is a pointer and touch target                   |
+| Table row                     | 32px + hairline | 20px line box + 6px top/bottom → 33px pitch                          |
+| Table header                  | 32px + hairline | `--sunk`, sticky                                                     |
+| Control (input/select/button) | 32px            | The system's baseline control height                                 |
+| Row-level icon button         | 24px            | **Not** a control — a 32px button in a padded cell forces a 44px row |
+| Rail item                     | 34px            | Slightly taller — it is a pointer and touch target                   |
 | Mobile row / tab / icon       | 44px            | Touch minimum, applied below `40rem` only                            |
 
-The 28px control height is what makes the ledger entry bar and the table it sits above read as one
+Cell padding is **6px vertical / `--space-3` horizontal**. The 12px horizontal figure is what stops
+adjacent money columns from colliding at this row height; the 6px vertical figure is what puts the
+row on 32px.
+
+The 32px control height is what makes the ledger entry bar and the table it sits above read as one
 instrument. Do not introduce a second control height for "comfortable" mode.
+
+> **Superseded: 28px.** The previous row and control height was 28px with 4px of cell padding. It
+> fit two more transactions on a laptop screen and read as cramped, which was half of why the app
+> felt lifeless. 32px is the deliberate trade: roughly two rows of density spent to buy a screen
+> that does not feel like a spreadsheet from 2011.
 
 Cells set an explicit **`line-height: 20px`** rather than inheriting the unitless 1.45. Without it a
 cell's line box drifts with its contents — a tag, an icon button or a nested `<form>` each contribute
@@ -365,34 +411,45 @@ one transaction among sixty, and every pixel of row padding is one fewer row on 
 
 ## Elevation & Depth
 
-| Level    | Treatment                                                                                     | Use                                                        |
-| -------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Flat     | No border, no shadow                                                                          | Page background, section headings                          |
-| Hairline | 1px `--line`                                                                                  | Tables, cards, the entry bar, section rules                |
-| Control  | 1px `--line-strong`                                                                           | Inputs, selects, secondary buttons — meaningful edges, 3:1 |
-| Sunk     | `--sunk` fill                                                                                 | Table headers, disabled inputs, inset wells                |
-| Raised   | 1px `--line` + `0 4px 12px rgb(0 0 0 / 0.10)` (light) / `0 4px 12px rgb(0 0 0 / 0.40)` (dark) | Dialogs and popovers **only**                              |
-| Focus    | `outline: 2px solid --focus; outline-offset: 1px`                                             | Every interactive element                                  |
+| Level    | Treatment                                         | Use                                                        |
+| -------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| Flat     | No border, no shadow                              | Page background, section headings                          |
+| Hairline | 1px `--line`                                      | Table dividers, section rules                              |
+| Card     | 1px `--line` + `--shadow-card`                    | Panels, KPI tiles, the entry bar, primary buttons          |
+| Control  | 1px `--line-strong`                               | Inputs, selects, secondary buttons — meaningful edges, 3:1 |
+| Sunk     | `--sunk` fill                                     | Table headers, disabled inputs, inset wells                |
+| Raised   | 1px `--line` + `--shadow-raised`                  | Dialogs and popovers **only**                              |
+| Focus    | `outline: 2px solid --focus; outline-offset: 1px` | Every interactive element                                  |
 
-The philosophy is **flat surfaces, hairline separation**. No glassmorphism, no gradient surfaces, no
-atmospheric backdrops, no colored shadows. The one shadow in the system exists to signal "this floats
-above and traps your keyboard" — a real semantic, used nowhere else.
+```
+--shadow-card    0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06)
+--shadow-raised  0 8px 24px rgb(16 24 40 / 0.12), 0 2px 6px rgb(16 24 40 / 0.08)
+```
+
+Two stacked shadows, both nearly transparent: the tight one draws the edge, the loose one seats the
+element on the canvas. That is the entire depth budget — a card outranks the table inside it, a
+dialog outranks the page, and nothing else floats.
+
+Still **no glassmorphism, no gradient surfaces, no atmospheric backdrops, no coloured shadows**. The
+previous rule was "no shadows except on dialogs", which left panel, tile, table and input all
+carrying identical visual weight; a card that cannot outrank its own contents is not a card.
 
 ---
 
 ## Shapes
 
-| Token      | Value  | Use                                          |
-| ---------- | ------ | -------------------------------------------- |
-| `--r-0`    | 0      | Table cells, sticky headers, full-bleed bars |
-| `--r-1`    | 3px    | Inputs, selects, buttons, tags               |
-| `--r-2`    | 4px    | Cards, the entry bar, notices                |
-| `--r-3`    | 6px    | Dialogs, the auth card                       |
-| `--r-full` | 9999px | Badges, avatars, the progress meter cap      |
+| Token      | Value  | Use                                                |
+| ---------- | ------ | -------------------------------------------------- |
+| `--r-0`    | 0      | Table cells, sticky headers, full-bleed bars       |
+| `--r-1`    | 6px    | Inputs, selects, buttons                           |
+| `--r-2`    | 8px    | Cards, panels, the entry bar, notices              |
+| `--r-3`    | 12px   | Dialogs, the auth card                             |
+| `--r-full` | 9999px | Tags, avatars, the progress meter and its fill cap |
 
-Radius stays small deliberately. Large uniform rounding is the strongest single tell of generic
-AI-generated UI, and it costs real estate at every corner. Nothing in Freyr is a pill except a status
-badge.
+Radius is soft but never uniform-round. Large rounding on everything is still the strongest single
+tell of generic AI-generated UI; 3px corners were the opposite error, and read as the chrome of a
+2011 admin panel. 6/8/12 is the middle that looks current without looking generated. Tags are the
+one fully-round element — a pill is what a tag is.
 
 ### Iconography
 
@@ -505,7 +562,7 @@ height, main scrolls independently so the rail never leaves.
 primary nav, a section heading, secondary nav, a spacer, then the footer cluster (theme toggle +
 logout). Uses the scoped rail token set throughout.
 
-**`rail-item`** — 30px tall, `--space-2` horizontal padding, `--r-1`, 16px icon + `--t-body` label,
+**`rail-item`** — 34px tall, `--space-2` horizontal padding, `--r-1`, 16px icon + `--t-body` label,
 `--rail-fg`. Hover: 8% white overlay. **Active:** a 2px `--rail-accent` left bar, an 12% white
 overlay, and weight 500. The amber bar is the only amber in the rail — it is how you know where you
 are, and it is the single most-used accent in the app.
@@ -541,7 +598,7 @@ page and the eye only has to learn it once.
 table or the `panel-body` prose. A table inside sheds its own border and fill — the panel has
 already drawn them, and a second box 1px inside the first is not depth, it is a mistake.
 
-Before this existed, a section was a bare uppercase `h2` floating above an unrelated bordered table,
+Before this existed, a section was a bare `h2` floating above an unrelated bordered table,
 which is why home could put an "Add" heading between two tables and strand a Lendings line at the
 foot of the page. On a phone the panel drops its box: the rows have already become cards, and a
 border around a stack of bordered cards is noise. The head stays — it is the only thing naming the
@@ -559,9 +616,9 @@ The row of summary tiles at the top of a screen. Equal tracks so the figures lin
 capped at `14rem` so three tiles on a wide screen stay a strip rather than stretching into three
 quarter-page banners. One per row below `40rem`.
 
-**`kpi-tile`** — `--surface`, 1px `--line`, `--r-2`, `--space-3` padding. Two lines only:
-`--t-label` in `--ink-muted`, then `--t-figure` tabular in `--ink`. An optional third element is a
-`delta-cell`. Never an icon — a big icon in a stat card is filler.
+**`kpi-tile`** — `--surface`, 1px `--line`, `--r-2`, `--shadow-card`, `--space-4` padding. Two lines
+only: `--t-label` in `--ink-muted` sentence case, then `--t-figure` tabular in `--ink`. An optional
+third element is a `delta-cell`. Never an icon — a big icon in a stat card is filler.
 
 A tile may not repeat a figure the screen's `hero` already carries. Home's headline reports what is
 left, of what was allocated, with how many days to go, so its tiles are income, spent and lendings
@@ -569,7 +626,7 @@ outstanding — three facts the sentence does not state. The same figure under t
 facts.
 
 **`data-table`** — `--surface`, 1px `--line`, `--r-2`, `border-collapse: collapse`. `--t-body`.
-Header row is `--sunk`, `--t-label`, uppercase, `position: sticky; top: 0`. Rows separated by 1px
+Header row is `--sunk`, `--t-label` at weight 500 in sentence case, `position: sticky; top: 0`. Rows separated by 1px
 `--line`; last row has none. Hover: `--hover`. This is the primary component of the entire
 application — everything else exists to support it. Inside a `panel` it drops its own border and
 fill. Column widths follow § Column rhythm.
@@ -607,14 +664,21 @@ state, because it is prose a reader must read and `--ink-faint` is a 3:1 decorat
 
 The rule lives in `delta()` in `src/lib/format.ts`, not in each call site.
 
-**`bucket-tag`** — A small `--r-1` tag naming a bucket (needs / wants / investments). `--t-caption`,
-uppercase, `--sunk` fill, `--ink-muted` text, 1px `--line`. Deliberately monochrome: buckets are
-categories, not directions, and coloring them would spend the semantic budget that gain/loss needs.
+**`bucket-tag`** — A `--r-full` pill naming a bucket (needs / wants / investments). `--t-caption` at
+weight 500, capitalised rather than uppercased, `--sunk` fill, `--ink-muted` text, 1px `--line`.
+Deliberately monochrome: buckets are categories, not directions, and colouring them would spend the
+semantic budget that gain/loss needs.
 
-**`progress-meter`** — An 8rem × 4px track, `--r-full`, `--sunk` fill, `overflow: hidden`. Below 80%
+**`progress-meter`** — A 5.5rem × 6px track, `--r-full`, `--sunk` fill, 1px `--line`,
+`overflow: hidden`. Below 80%
 of allocation the fill is `--brand`; 80–100% it is `--accent`. Always paired with a text percentage,
 beside it or in the next column — the bar is a glance, the number is the truth. No allocation to
 measure against renders `—`, not an empty track.
+
+The track is **5.5rem, not the 8rem it once was**, because its cell is the widest non-money column
+in a bucket table: at 8rem the table laid out 18px past its panel and clipped the Remaining figure.
+The width came out of the bar rather than out of a money column precisely because the bar is the
+glance and the percentage beside it is the truth.
 
 **Over the cap the track rescales rather than overflowing.** The fill takes `100 ÷ pct` of the
 track's width and an excess segment takes the rest, so the allocation and the overspend are both
@@ -657,19 +721,19 @@ the reflow's hide-the-unlabelled rule carves it out by class.
 the note field takes remaining width. It sits directly above the table it feeds, so a new row appears
 where the eye already is. Below `40rem` it stacks to full-width fields.
 
-**`field`** — `--t-label` label above a control, `--space-0` gap. Labels are always present and always
+**`field`** — `--t-label` label above a control, `--space-1` gap. Labels are always present and always
 visible; placeholder-as-label is not permitted.
 
-**`input-text` / `select` / `input-date`** — 28px, `--space-1`/`--space-2` padding, 1px
-`--line-strong`, `--r-1`, `--surface` fill, `--t-control`. Focus: 2px `--focus` outline, 1px offset.
-Disabled: `--sunk` fill, `--ink-faint` text.
+**`input-text` / `select` / `input-date`** — 32px, `--space-3` horizontal padding, 1px
+`--line-strong`, `--r-1`, `--surface` fill, `--t-control`. Hover: border to `--ink-faint`. Focus: 2px
+`--focus` outline, 1px offset. Disabled: `--sunk` fill, `--ink-faint` text.
 
 **`input-money`** — As `input-text` but right-aligned, tabular, `inputmode="decimal"`, `7rem` wide,
 with a `₹` prefix in `--ink-muted`. Accepts grouped input (`1,250.50`); `src/lib/money.ts` owns
 parsing.
 
-**`button-primary`** — `--brand` fill, `--on-brand` text (white light / near-black dark), 28px, `--r-1`,
-`--t-control` at weight 500. Hover `--brand-hover`. One per screen region.
+**`button-primary`** — `--brand` fill, `--on-brand` text (white light / near-black dark), 32px, `--r-1`,
+`--shadow-card`, `--t-control` at weight 500. Hover `--brand-hover`. One per screen region.
 
 **`button-secondary`** — `--surface` fill, 1px `--line-strong`, `--ink` text. Hover `--hover`.
 
@@ -730,14 +794,18 @@ at 56px above the heading. The only place the full figure appears in the app.
 
 - Don't fill a row, cell, or card with `--gain` or `--loss`. Color blocks make a dense table
   unscannable and destroy the sign convention.
-- Don't use `--accent` for body text in light mode — it reaches 3.67:1. Use `--accent-text`.
+- Don't use `--accent` for body text in light mode — it reaches 4.01:1 at best and 3.54:1 on
+  `--sunk`. Use `--accent-text`.
 - Don't use `--ink-faint` for anything a user must read. It is a 3:1 decorative token.
 - Don't set `html { font-size }` in pixels. It overrides the reader's browser preference.
 - Don't add a second control height, a "comfortable" mode, or a density toggle. One density, chosen
   correctly.
 - Don't introduce a third brand color. The system is evergreen and amber.
-- Don't reach for shadows to create hierarchy — hairlines and the `--sunk` step already do it. The
-  only shadow belongs to dialogs.
+- **Don't uppercase and letterspace a label to make it look like a label.** Sentence case at
+  `--t-label` in `--ink-muted` is what a label looks like here. The uppercase treatment is the
+  single most dating habit this system had, and it had spread to six components at once.
+- Don't push depth past `--shadow-card`. Hairlines, the `--sunk` step and one 4%-opacity shadow are
+  the whole budget; anything heavier is elevation theatre.
 - Don't use emoji as icons, gradient surfaces, glassmorphism, or oversized uniform rounding.
 - Don't center-align body content on ordinary screens. Auth is the only centered layout.
 - Don't animate anything that isn't a state change under 150ms. No page transitions, no number
@@ -779,17 +847,17 @@ information; a cell with `data-label=""` (the row action) is parked in the card'
 claiming a line. Two consequences worth stating, because both have already been shipped wrong: any
 new cell that is not a labelled field — the `empty-state` line above all — needs its own carve-out or
 it vanishes on phones; and a label must never be added merely to keep a cell visible, because that
-prints an uppercase heading over a blank value.
+prints a heading over a blank value.
 
 ### Touch
 
 Stated per control class and **measured against `src/app.css`**, not asserted as a blanket figure:
 
 - **Targets that are small in both axes are ≥ 44×44px below `40rem`.** The row delete
-  (`button.icon`, 20px in a desktop row) and the month-stepper arrows both go to 44×44; the tab bar's
+  (`button.icon`, 24px in a desktop row) and the month-stepper arrows both go to 44×44; the tab bar's
   tabs are 52 tall and a fifth of the viewport; the `entry-bar` disclosure is 44 tall and full width.
 - **Text inputs, selects and buttons are 36px tall, not 44** — `input, select, button { height: 36px }`,
-  up from the 28px `--control-h` that desktop uses. They are full-width or text-labelled, so the
+  up from the 32px `--control-h` that desktop uses. They are full-width or text-labelled, so the
   target is a wide band and only the height is under 44: that clears WCAG 2.2 AA's 24×24 minimum with
   room to spare, where 44×44 is the AAA figure. Raising it would spend 8px per control on the densest
   screens in the app — `entry-bar` stacks eight of them on a phone — to enlarge targets nobody misses.

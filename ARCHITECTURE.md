@@ -172,6 +172,12 @@ from a raw dump of the real workbook:
   form action (`POST /theme`), so it works with JavaScript off. No cookie means no attribute,
   and `prefers-color-scheme` decides. `/theme` is exempt from both auth redirects so the
   toggle also works on the login and setup screens.
+- **Every cookie sets `secure: false` explicitly.** Freyr does not terminate TLS and is reached
+  over a plain-HTTP LAN or Tailscale address, but SvelteKit defaults `secure` to true off
+  localhost — and a browser silently drops a Secure cookie on `http://`. The theme cookie
+  omitted the flag and so appeared to do nothing on every device except the box itself, which
+  is invisible in local testing and total in real use. If TLS is ever terminated in front of
+  Freyr, these three call sites are what to revisit.
 - **One stylesheet, no component library, no CSS build step.** Tokens are plain custom
   properties; the dark theme re-declares them under `[data-theme='dark']` and again inside a
   `prefers-color-scheme` block for the no-cookie case. The duplication is deliberate — the

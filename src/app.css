@@ -8,57 +8,63 @@
 :root {
 	color-scheme: light;
 
-	/* surfaces */
-	--canvas: #fbfaf8;
+	/* surfaces — neutral and slightly cool. The warm-paper ramp this replaced
+	   read as aged rather than warm, and beige-on-beige is the single loudest
+	   period tell a UI can carry. */
+	--canvas: #f7f8fa;
 	--surface: #ffffff;
-	--sunk: #f3f1ec;
-	--line: #e3e0d9;
-	--line-strong: #8d8a81;
+	--sunk: #eff1f4;
+	--line: #e2e5ea;
+	--line-strong: #7e8691;
 
 	/* text */
-	--ink: #14201a;
-	--ink-muted: #5c6862;
-	--ink-faint: #828c85;
+	--ink: #0f1419;
+	--ink-muted: #5a626c;
+	--ink-faint: #767e89;
 
 	/* brand + accent */
-	--brand: #2c4a3b;
-	--brand-hover: #223b2f;
-	--brand-tint: #e9efea;
+	--brand: #0b6248;
+	--brand-hover: #084e39;
+	--brand-tint: #e2f1ea;
 	--on-brand: #ffffff;
-	--accent: #c1730e;
-	--accent-text: #8f540a;
-	--accent-tint: #fbf1e0;
-	--on-accent: #14201a;
+	--accent: #c2670a;
+	--accent-text: #97520a;
+	--accent-tint: #fdf1e1;
+	--on-accent: #0f1419;
 
 	/* money */
-	--gain: #147e3b;
-	--loss: #be2e29;
+	--gain: #0e7a3c;
+	--loss: #c02a2a;
 
 	/* rail — a dark surface in both themes, so it carries its own ramp */
-	--rail-bg: #2c4a3b;
-	--rail-fg: #eaf0ec;
-	--rail-muted: #a6beb0;
-	--rail-accent: #e7a34a;
+	--rail-bg: #14201b;
+	--rail-fg: #e8edea;
+	--rail-muted: #9ba8a1;
+	--rail-accent: #f0a94c;
 	--rail-focus: #ffffff;
-	--rail-hover: rgb(255 255 255 / 0.08);
-	--rail-active: rgb(255 255 255 / 0.14);
+	--rail-hover: rgb(255 255 255 / 0.07);
+	--rail-active: rgb(255 255 255 / 0.12);
 
 	/* state */
 	--focus: var(--accent);
-	--hover: #f3f1ec;
+	--hover: #f1f3f5;
 	--selected: var(--brand-tint);
-	--shadow-raised: 0 4px 12px rgb(0 0 0 / 0.1);
+	/* Two stacked shadows, both nearly transparent: the tight one draws the
+	   edge, the loose one seats the card on the canvas. This is the whole of
+	   the depth budget — a card outranks a table, and nothing else floats. */
+	--shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+	--shadow-raised: 0 8px 24px rgb(16 24 40 / 0.12), 0 2px 6px rgb(16 24 40 / 0.08);
 
 	/* type scale — rem so the reader's font-size preference is respected */
-	--t-hero: 1.625rem;
-	--t-figure: 1.25rem;
-	--t-title: 1.0625rem;
-	--t-section: 0.8125rem;
+	--t-hero: 1.75rem;
+	--t-figure: 1.375rem;
+	--t-title: 1.25rem;
+	--t-section: 0.9375rem;
 	--t-body: 0.875rem;
 	--t-num: 0.875rem;
-	--t-control: 0.8125rem;
+	--t-control: 0.875rem;
 	--t-label: 0.75rem;
-	--t-caption: 0.6875rem;
+	--t-caption: 0.75rem;
 
 	/* spacing — 4px base */
 	--space-0: 2px;
@@ -71,14 +77,14 @@
 	--space-7: 48px;
 
 	/* radius */
-	--r-1: 3px;
-	--r-2: 4px;
-	--r-3: 6px;
+	--r-1: 6px;
+	--r-2: 8px;
+	--r-3: 12px;
 	--r-full: 9999px;
 
 	/* density */
-	--row-h: 28px;
-	--control-h: 28px;
+	--row-h: 32px;
+	--control-h: 32px;
 	--rail-w: 12rem;
 	--rail-w-icon: 3.5rem;
 
@@ -88,35 +94,36 @@
 :root[data-theme='dark'] {
 	color-scheme: dark;
 
-	--canvas: #0e1411;
-	--surface: #151e19;
-	--sunk: #0f1713;
-	--line: #24312a;
-	--line-strong: #5e7366;
+	--canvas: #0d1117;
+	--surface: #151b23;
+	--sunk: #11171e;
+	--line: #262e38;
+	--line-strong: #5c6773;
 
-	--ink: #e6ede8;
-	--ink-muted: #94a29a;
-	--ink-faint: #6a7972;
+	--ink: #e6eaf0;
+	--ink-muted: #9aa4b2;
+	--ink-faint: #6e7885;
 
-	--brand: #64a181;
-	--brand-hover: #78b394;
-	--brand-tint: #1a2a22;
-	--on-brand: #0e1411;
-	--accent: #e7a34a;
-	--accent-text: #e7a34a;
-	--accent-tint: #2a2117;
-	--on-accent: #0e1411;
+	--brand: #3fb98a;
+	--brand-hover: #55c99b;
+	--brand-tint: #14312a;
+	--on-brand: #06120d;
+	--accent: #e5a03f;
+	--accent-text: #e5a03f;
+	--accent-tint: #2a2016;
+	--on-accent: #0d1117;
 
-	--gain: #34c77b;
+	--gain: #3dd68c;
 	--loss: #f0656b;
 
-	--rail-bg: #16241d;
-	--rail-fg: #dce6df;
-	--rail-muted: #8ca396;
-	--rail-focus: #e7a34a;
+	--rail-bg: #0f1613;
+	--rail-fg: #e3eae6;
+	--rail-muted: #93a29b;
+	--rail-focus: #f0a94c;
 
-	--hover: #1b2620;
-	--shadow-raised: 0 4px 12px rgb(0 0 0 / 0.4);
+	--hover: #1b222b;
+	--shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.2);
+	--shadow-raised: 0 8px 24px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
 }
 
 /* No cookie set → follow the OS. Same values as the block above. */
@@ -124,35 +131,36 @@
 	:root:not([data-theme='light']) {
 		color-scheme: dark;
 
-		--canvas: #0e1411;
-		--surface: #151e19;
-		--sunk: #0f1713;
-		--line: #24312a;
-		--line-strong: #5e7366;
+		--canvas: #0d1117;
+		--surface: #151b23;
+		--sunk: #11171e;
+		--line: #262e38;
+		--line-strong: #5c6773;
 
-		--ink: #e6ede8;
-		--ink-muted: #94a29a;
-		--ink-faint: #6a7972;
+		--ink: #e6eaf0;
+		--ink-muted: #9aa4b2;
+		--ink-faint: #6e7885;
 
-		--brand: #64a181;
-		--brand-hover: #78b394;
-		--brand-tint: #1a2a22;
-		--on-brand: #0e1411;
-		--accent: #e7a34a;
-		--accent-text: #e7a34a;
-		--accent-tint: #2a2117;
-		--on-accent: #0e1411;
+		--brand: #3fb98a;
+		--brand-hover: #55c99b;
+		--brand-tint: #14312a;
+		--on-brand: #06120d;
+		--accent: #e5a03f;
+		--accent-text: #e5a03f;
+		--accent-tint: #2a2016;
+		--on-accent: #0d1117;
 
-		--gain: #34c77b;
+		--gain: #3dd68c;
 		--loss: #f0656b;
 
-		--rail-bg: #16241d;
-		--rail-fg: #dce6df;
-		--rail-muted: #8ca396;
-		--rail-focus: #e7a34a;
+		--rail-bg: #0f1613;
+		--rail-fg: #e3eae6;
+		--rail-muted: #93a29b;
+		--rail-focus: #f0a94c;
 
-		--hover: #1b2620;
-		--shadow-raised: 0 4px 12px rgb(0 0 0 / 0.4);
+		--hover: #1b222b;
+		--shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.2);
+		--shadow-raised: 0 8px 24px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
 	}
 }
 
@@ -287,9 +295,7 @@ body {
 	margin: var(--space-4) 0 var(--space-1);
 	padding: 0 var(--space-2);
 	font-size: var(--t-label);
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
+	font-weight: 500;
 	color: var(--rail-muted);
 }
 
@@ -297,7 +303,7 @@ body {
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-	min-height: 30px;
+	min-height: 34px;
 	padding: 0 var(--space-2);
 	border-left: 2px solid transparent;
 	border-radius: var(--r-1);
@@ -378,19 +384,23 @@ main {
 
 /* ---- Typography -------------------------------------------------------- */
 
+/* Hierarchy is carried by size and weight, not by case. The uppercase tracked
+   micro-label was doing that job at three separate levels — section head, table
+   header, tile label — which is why nothing on the page outranked anything
+   else and the whole screen read as one field of small grey text. */
 h1 {
 	margin: 0 0 var(--space-3);
 	font-size: var(--t-title);
-	font-weight: 600;
+	font-weight: 650;
+	letter-spacing: -0.01em;
 }
 
 h2 {
 	margin: var(--space-5) 0 var(--space-2);
 	font-size: var(--t-section);
 	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	color: var(--ink-muted);
+	letter-spacing: -0.005em;
+	color: var(--ink);
 }
 
 .muted {
@@ -502,6 +512,7 @@ h2 {
 	background: var(--surface);
 	border: 1px solid var(--line);
 	border-radius: var(--r-2);
+	box-shadow: var(--shadow-card);
 }
 
 /* A panel whose table has no column that wants more than its content — all
@@ -527,7 +538,7 @@ h2 {
 	align-items: baseline;
 	gap: var(--space-2) var(--space-3);
 	flex-wrap: wrap;
-	padding: var(--space-1) var(--space-3);
+	padding: var(--space-3) var(--space-4);
 	border-bottom: 1px solid var(--line);
 }
 
@@ -563,7 +574,7 @@ h2 {
 
 /* A panel holding prose rather than a table still needs its padding. */
 .panel-body {
-	padding: var(--space-3);
+	padding: var(--space-4);
 }
 
 .panel-body > :last-child {
@@ -596,24 +607,24 @@ h2 {
 
 .kpi {
 	min-width: 0;
-	padding: var(--space-3);
+	padding: var(--space-4);
 	background: var(--surface);
 	border: 1px solid var(--line);
 	border-radius: var(--r-2);
+	box-shadow: var(--shadow-card);
 }
 
 .kpi .label {
 	font-size: var(--t-label);
 	font-weight: 500;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
 	color: var(--ink-muted);
 }
 
 .kpi .value {
-	margin-top: var(--space-0);
+	margin-top: var(--space-1);
 	font-size: var(--t-figure);
-	font-weight: 600;
+	font-weight: 650;
+	letter-spacing: -0.015em;
 	font-variant-numeric: tabular-nums;
 }
 
@@ -629,9 +640,9 @@ h2 {
 
 .hero .figure {
 	font-size: var(--t-hero);
-	font-weight: 600;
+	font-weight: 680;
 	line-height: 1.15;
-	letter-spacing: -0.01em;
+	letter-spacing: -0.025em;
 	font-variant-numeric: tabular-nums;
 }
 
@@ -704,13 +715,14 @@ table {
 
 th,
 td {
-	padding: var(--space-1) var(--space-2);
+	padding: 6px var(--space-3);
 	/* Fixed line box: with 4px of vertical padding this is what makes a row
 	   land on --row-h regardless of whether the cell holds text, a tag or an
 	   icon button. Inheriting a unitless 1.45 lets each cell drift. */
 	line-height: 20px;
 	text-align: left;
 	border-bottom: 1px solid var(--line);
+	/* 6px + the 20px line box = the 32px row. */
 	/* Column rhythm. A 100%-wide auto-layout table hands its slack to whichever
 	   column will take it — which is how a right-aligned date ended up floating
 	   350px from the left edge of its own row with a void beside it. Every
@@ -734,11 +746,9 @@ th {
 	position: sticky;
 	top: 0;
 	z-index: 1;
-	height: 26px;
+	height: 30px;
 	font-size: var(--t-label);
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	font-weight: 500;
 	color: var(--ink-muted);
 	background: var(--sunk);
 	white-space: nowrap;
@@ -780,7 +790,7 @@ td.amount {
    share one baseline length and can be compared against each other. Not a
    child combinator: the meter shares a .meter-cell with its percentage. */
 td:has(.meter) {
-	width: 11rem;
+	width: 10rem;
 }
 
 /* A block-level form inside a cell generates its own line box and adds
@@ -801,25 +811,30 @@ td form {
 	/* Baseline-aligned inline-blocks reserve descender space below the box and
 	   push the row taller than --row-h. Middle alignment removes it. */
 	vertical-align: middle;
-	padding: 0 var(--space-1);
-	line-height: 16px;
+	padding: 0 var(--space-2);
+	line-height: 18px;
 	font-size: var(--t-caption);
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
+	font-weight: 500;
 	color: var(--ink-muted);
 	background: var(--sunk);
 	border: 1px solid var(--line);
-	border-radius: var(--r-1);
+	border-radius: var(--r-full);
 	white-space: nowrap;
+	text-transform: capitalize;
 }
 
+/* 5.5rem, not 8: the meter cell is the widest non-money column in a bucket
+   table, and at 8rem it pushed the table 18px past its panel and clipped the
+   Remaining figure. The bar is a glance and the percentage beside it is the
+   truth, so the width came out of the bar. */
 .meter {
 	display: inline-flex;
 	vertical-align: middle;
-	width: 8rem;
+	width: 5.5rem;
 	max-width: 100%;
-	height: 4px;
+	height: 6px;
 	background: var(--sunk);
+	border: 1px solid var(--line);
 	border-radius: var(--r-full);
 	overflow: hidden;
 }
@@ -851,7 +866,7 @@ td form {
 
 label {
 	display: block;
-	margin-bottom: var(--space-0);
+	margin-bottom: var(--space-1);
 	font-size: var(--t-label);
 	font-weight: 500;
 	color: var(--ink-muted);
@@ -868,10 +883,17 @@ button {
 input,
 select {
 	height: var(--control-h);
-	padding: 0 var(--space-2);
+	padding: 0 var(--space-3);
 	background: var(--surface);
 	border: 1px solid var(--line-strong);
 	border-radius: var(--r-1);
+}
+
+@media (hover: hover) {
+	input:hover,
+	select:hover {
+		border-color: var(--ink-faint);
+	}
 }
 
 input:disabled,
@@ -896,6 +918,7 @@ button {
 	gap: var(--space-1);
 	height: var(--control-h);
 	padding: 0 var(--space-3);
+	font-weight: 500;
 	background: var(--surface);
 	border: 1px solid var(--line-strong);
 	border-radius: var(--r-1);
@@ -913,7 +936,7 @@ button.primary {
 	background: var(--brand);
 	border-color: var(--brand);
 	color: var(--on-brand);
-	font-weight: 500;
+	box-shadow: var(--shadow-card);
 }
 
 @media (hover: hover) {
@@ -940,8 +963,8 @@ button.ghost {
 /* Row-level affordance, not a form control: 20px so a table row stays at
    --row-h. A 28px control plus cell padding makes a 36px row. */
 button.icon {
-	width: 20px;
-	height: 20px;
+	width: 24px;
+	height: 24px;
 	padding: 0;
 	vertical-align: middle;
 	justify-content: center;
@@ -964,13 +987,14 @@ button.icon {
 
 .entry {
 	display: flex;
-	gap: var(--space-2);
+	gap: var(--space-2) var(--space-3);
 	align-items: end;
 	flex-wrap: wrap;
-	padding: var(--space-2);
+	padding: var(--space-3);
 	background: var(--surface);
 	border: 1px solid var(--line);
 	border-radius: var(--r-2);
+	box-shadow: var(--shadow-card);
 }
 
 /* On desktop the entry bar is always open and the <summary> is inert — the
@@ -1026,7 +1050,7 @@ button.icon {
 .stepper .current {
 	min-width: 9rem;
 	text-align: center;
-	font-size: var(--t-title);
+	font-size: var(--t-section);
 	font-weight: 600;
 }
 
@@ -1277,8 +1301,6 @@ button.icon {
 		flex: none;
 		font-size: var(--t-label);
 		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
 		color: var(--ink-muted);
 	}
 

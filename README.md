@@ -37,16 +37,19 @@ rationale and [ARCHITECTURE.md](ARCHITECTURE.md) for how it's put together.
 
 ## Interface
 
-Dense and keyboard-first: 29px table rows, 28px controls, tabular figures, and a month of
+Dense and keyboard-first: 33px table rows, 32px controls, tabular figures, and a month of
 transactions on one screen. Every screen opens the same way — name, the period it is showing,
 then its controls in the same right-hand corner — and every section is a panel with a heading
 of its own. Table columns take their content's width, with one column per table absorbing the
 slack, so a figure stays beside the row it belongs to instead of drifting to the far edge of a
-wide display; where two tables fit side by side, they sit side by side. Light and dark themes
-are both first-class — the theme is a cookie resolved during SSR, so there's no flash on load
-and the toggle works with JavaScript off. Responsive down to a phone, where the rail becomes a
-bottom tab bar and tables reflow to cards. Every colour pair is contrast-verified (text ≥
-4.5:1, UI boundaries ≥ 3:1) in both themes.
+wide display; where two tables fit side by side, they sit side by side. The palette is cool
+neutral surfaces under a near-black evergreen rail, with green reserved for chrome and a
+separate, brighter green reserved for money — the two are held apart on both luminance and hue
+so a link can never be mistaken for a gain. Light and dark themes are both first-class — the
+theme is a cookie resolved during SSR, so there's no flash on load and the toggle works with
+JavaScript off. Responsive down to a phone, where the rail becomes a bottom tab bar and tables
+reflow to cards. Every colour pair is contrast-verified (text ≥ 4.5:1, UI boundaries ≥ 3:1) in
+both themes, against every surface it can legally sit on.
 
 The full spec — palette, type scale, components, responsive rules, and the logo — is
 [DESIGN.md](DESIGN.md).
