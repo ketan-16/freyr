@@ -24,7 +24,9 @@ rationale and [ARCHITECTURE.md](ARCHITECTURE.md) for how it's put together.
   then the same add form the ledger uses, inline above recent activity, so a transaction
   lands without leaving the page.
 - **Ledger** — every transaction for a month, filterable by month/year/bucket, with the same
-  add form above the table it feeds.
+  add form above the table it feeds. Entry is four answers and a note: date, amount, where it
+  belongs (a bucket for an outflow, a source for income), and a category — and the category
+  dropdown holds only the categories that belong to what you just picked, so it stays short.
 - **Monthly** — allocated vs actual vs remaining per bucket, with month-over-month deltas.
   Left/right arrows step the month while the stepper has focus.
 - **Yearly** — three tiles (income, spent, net) over three tables: allocation vs actual with
@@ -34,6 +36,11 @@ rationale and [ARCHITECTURE.md](ARCHITECTURE.md) for how it's put together.
   a base split, a raise split, and one row per raise. The budget periods are projected from
   those, so a promotion re-weights every month after it automatically. A period can still be
   typed by hand to correct a single month, and a hand-typed one is never overwritten.
+- **Category settings** — the list behind that dropdown. Each category belongs to one bucket
+  or one income source; names are unique within that, so "Travel" can be both a need and a
+  want. Renaming carries every transaction filed under it. A category the ledger still points
+  at can only be archived — it leaves the dropdown and keeps its history — and delete is
+  offered only where nothing would lose its label.
 
 ## Interface
 

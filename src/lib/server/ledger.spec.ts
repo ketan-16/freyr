@@ -1,12 +1,11 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fromRupees, type Paise } from '$lib/money';
+import { createCategory } from './categories';
 import { createGoal, ensureLocation } from './goals';
 import {
 	createTransaction,
 	deleteTransaction,
-	ensureCategory,
-	listCategories,
 	listTransactions,
 	monthlyActuals,
 	monthlyActualsForYear,
@@ -40,7 +39,7 @@ describe('createTransaction', () => {
 	});
 
 	it('creates a bucketed outflow with a category', () => {
-		const categoryId = ensureCategory(db, 'Grocery');
+		const categoryId = createCategory(db, { scope: 'needs', name: 'Grocery' });
 		const id = createTransaction(db, {
 			date: '2026-07-02',
 			amountPaise: 50000,
@@ -112,14 +111,16 @@ describe('createTransaction', () => {
 });
 
 describe('listTransactions', () => {
-	it('filters by month and bucket, newest first, with joined names', () => {
+	it('filters by month and bucket, newest first, with the category name', () => {
 		const goalId = createGoal(db, { name: 'Car', kind: 'goal' });
 		const locationId = ensureLocation(db, 'Bank');
+		const categoryId = createCategory(db, { scope: 'needs', name: 'Grocery' });
 		createTransaction(db, {
 			date: '2026-06-15',
 			amountPaise: 100,
 			direction: 'outflow',
-			bucket: 'needs'
+			bucket: 'needs',
+			categoryId
 		});
 		createTransaction(db, {
 			date: '2026-07-10',
@@ -138,8 +139,13 @@ describe('listTransactions', () => {
 
 		const july = listTransactions(db, { year: 2026, month: 7 });
 		expect(july.map((t) => t.amountPaise)).toEqual([300, 200]);
-		expect(july[0].goalName).toBe('Car');
-		expect(july[0].locationName).toBe('Bank');
+		// Goal and location stay as ids on the row: no screen prints their names,
+		// so listTransactions no longer joins for them.
+		expect(july[0].goalId).toBe(goalId);
+		expect(july[0].locationId).toBe(locationId);
+
+		const [june] = listTransactions(db, { year: 2026, month: 6 });
+		expect(june.categoryName).toBe('Grocery');
 
 		const wants = listTransactions(db, { year: 2026, month: 7, bucket: 'wants' });
 		expect(wants).toHaveLength(1);
@@ -157,16 +163,6 @@ describe('deleteTransaction', () => {
 		});
 		deleteTransaction(db, id);
 		expect(listTransactions(db, {})).toHaveLength(0);
-	});
-});
-
-describe('categories', () => {
-	it('ensureCategory is idempotent and listCategories sorts', () => {
-		const a = ensureCategory(db, 'Grocery');
-		const b = ensureCategory(db, 'Grocery');
-		ensureCategory(db, 'Fuel');
-		expect(a).toBe(b);
-		expect(listCategories(db).map((c) => c.name)).toEqual(['Fuel', 'Grocery']);
 	});
 });
 

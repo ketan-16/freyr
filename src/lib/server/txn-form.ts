@@ -1,40 +1,67 @@
 /**
  * One place where posted form values become a transaction. Both the ledger and
  * the home command centre write through here, so their validation, trimming and
- * category-creation behaviour cannot drift apart.
+ * category rules cannot drift apart.
  */
 
 import type { DatabaseSync } from 'node:sqlite';
 import { parseMoney } from '$lib/money';
 import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
-import { listGoals, listLocations } from './goals';
+import {
+	getCategory,
+	listCategories,
+	SCOPE_LABELS,
+	type Category,
+	type CategoryScope
+} from './categories';
 import {
 	createTransaction,
-	ensureCategory,
-	listCategories,
 	type Bucket,
-	type Category,
 	type Direction,
 	type Source,
 	type TxnInput
 } from './ledger';
 
+/**
+ * The posted category, checked against the scope it has to belong to — the
+ * bucket for an outflow, the source for income. That check is this app's only
+ * cross-table invariant, so it has no CHECK behind it and lives here instead;
+ * nothing else in the app writes category_id.
+ *
+ * A null scope means the form named neither a bucket nor a source. That is
+ * createTransaction's error to report, in its own words, so this says nothing.
+ */
+function categoryFor(
+	db: DatabaseSync,
+	scope: CategoryScope | null,
+	posted: string | undefined
+): number | undefined {
+	if (!scope) return undefined;
+
+	const id = Number(posted);
+	if (!posted || !Number.isInteger(id) || id <= 0) throw new Error('Pick a category.');
+
+	const category = getCategory(db, id);
+	if (!category) throw new Error('That category no longer exists.');
+	if (category.scope !== scope)
+		throw new Error(`"${category.name}" is not a ${SCOPE_LABELS[scope].toLowerCase()} category.`);
+	return id;
+}
+
 /** Throws with a readable message on invalid input; callers turn that into a 400. */
 export function createFromForm(db: DatabaseSync, values: Record<string, string>): number {
 	const direction = values.direction as Direction;
-	const categoryName = values.category?.trim();
+	const bucket = direction === 'outflow' ? (values.bucket as Bucket) : undefined;
+	const incomeSource = direction === 'income' ? (values.source as Source) : undefined;
 
 	const input: TxnInput = {
 		date: values.date,
 		amountPaise: parseMoney(values.amount || ''),
 		direction,
-		bucket: direction === 'outflow' ? (values.bucket as Bucket) : undefined,
-		incomeSource: direction === 'income' ? (values.source as Source) : undefined,
+		bucket,
+		incomeSource,
 		note: values.note?.trim() || undefined,
-		categoryId:
-			direction === 'outflow' && categoryName ? ensureCategory(db, categoryName) : undefined,
-		goalId: values.goal ? Number(values.goal) : undefined,
-		locationId: values.location ? Number(values.location) : undefined
+		categoryId: categoryFor(db, bucket ?? incomeSource ?? null, values.category)
 	};
 
 	return createTransaction(db, input);
@@ -47,15 +74,11 @@ export function entryOptions(
 ): {
 	today: string;
 	categories: Category[];
-	goals: { id: number; name: string }[];
-	locations: { id: number; name: string }[];
 } {
-	return {
-		today,
-		categories: listCategories(db),
-		goals: listGoals(db).filter((g) => g.status === 'active'),
-		locations: listLocations(db)
-	};
+	// The whole list, every scope, in one read: the bar filters it to the
+	// selected bucket or source in the browser, so switching bucket costs no
+	// round trip and the page carries a few dozen rows to pay for it.
+	return { today, categories: listCategories(db) };
 }
 
 /**

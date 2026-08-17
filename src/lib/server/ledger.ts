@@ -35,10 +35,12 @@ export interface Txn {
 	goalId: number | null;
 	locationId: number | null;
 	lendingId: number | null;
+	/**
+	 * The only joined name a row carries: it is the only one any screen prints.
+	 * Goal, location and lending names were joined for a ledger column that no
+	 * longer exists — goal progress reads them from `goals` instead.
+	 */
 	categoryName: string | null;
-	goalName: string | null;
-	locationName: string | null;
-	lendingPerson: string | null;
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -122,13 +124,9 @@ export function listTransactions(db: DatabaseSync, f: TxnFilter): Txn[] {
 		.prepare(
 			`SELECT t.id, t.date, t.amount_paise, t.direction, t.bucket, t.income_source,
 			        t.note, t.imported, t.category_id, t.goal_id, t.location_id, t.lending_id,
-			        c.name AS category_name, g.name AS goal_name,
-			        loc.name AS location_name, l.person AS lending_person
+			        c.name AS category_name
 			 FROM transactions t
 			 LEFT JOIN categories c ON c.id = t.category_id
-			 LEFT JOIN goals g ON g.id = t.goal_id
-			 LEFT JOIN locations loc ON loc.id = t.location_id
-			 LEFT JOIN lendings l ON l.id = t.lending_id
 			 ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
 			 ORDER BY t.date DESC, t.id DESC
 			 ${f.limit ? 'LIMIT ?' : ''}`
@@ -148,26 +146,8 @@ export function listTransactions(db: DatabaseSync, f: TxnFilter): Txn[] {
 		goalId: r.goal_id as number | null,
 		locationId: r.location_id as number | null,
 		lendingId: r.lending_id as number | null,
-		categoryName: r.category_name as string | null,
-		goalName: r.goal_name as string | null,
-		locationName: r.location_name as string | null,
-		lendingPerson: r.lending_person as string | null
+		categoryName: r.category_name as string | null
 	}));
-}
-
-export interface Category {
-	id: number;
-	name: string;
-}
-
-export function listCategories(db: DatabaseSync): Category[] {
-	return db.prepare('SELECT id, name FROM categories ORDER BY name').all() as unknown as Category[];
-}
-
-export function ensureCategory(db: DatabaseSync, name: string): number {
-	db.prepare('INSERT OR IGNORE INTO categories (name) VALUES (?)').run(name);
-	const row = db.prepare('SELECT id FROM categories WHERE name = ?').get(name) as { id: number };
-	return row.id;
 }
 
 // ---- Rollups (computed, never stored) ----

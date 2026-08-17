@@ -981,6 +981,30 @@ button.icon {
 	}
 }
 
+/* An editable cell: a text field that reads as table content until it is
+   reached for. A column of ordinary inputs reads as a wall of boxes and buries
+   the values it is there to show, so the border arrives on hover and focus. */
+input.row-input {
+	width: 100%;
+	min-width: 7rem;
+	height: 24px;
+	padding: 0 var(--space-2);
+	background: none;
+	border-color: transparent;
+}
+
+input.row-input:focus,
+input.row-input:hover {
+	background: var(--surface);
+	border-color: var(--line-strong);
+}
+
+/* More than one row-level affordance in the same cell. */
+.cell-actions {
+	display: flex;
+	gap: var(--space-1);
+}
+
 .field {
 	display: flex;
 	flex-direction: column;

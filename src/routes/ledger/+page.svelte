@@ -71,7 +71,6 @@
 					<th scope="col" class="num">Amount</th>
 					<th scope="col">Type</th>
 					<th scope="col">Category</th>
-					<th scope="col">Goal</th>
 					<th scope="col" class="wrap">Note</th>
 					<th scope="col"><span class="visually-hidden">Actions</span></th>
 				</tr>
@@ -94,11 +93,6 @@
 							{/if}
 						</td>
 						<td data-label={t.categoryName ? 'Category' : null}>{t.categoryName ?? ''}</td>
-						<td data-label={t.goalName || t.lendingPerson ? 'Goal' : null}>
-							{#if t.goalName}{t.goalName}
-								<span class="faint">@ {t.locationName}</span>{/if}
-							{#if t.lendingPerson}<span class="faint">{t.lendingPerson}</span>{/if}
-						</td>
 						<td data-label={t.note ? 'Note' : null} class="muted wrap">{t.note ?? ''}</td>
 						<td data-label="">
 							<form method="POST" action="?/delete" use:enhance>
@@ -110,7 +104,7 @@
 						</td>
 					</tr>
 				{:else}
-					<tr><td class="empty" colspan="7">No transactions this month.</td></tr>
+					<tr><td class="empty" colspan="6">No transactions this month.</td></tr>
 				{/each}
 			</tbody>
 		</table>

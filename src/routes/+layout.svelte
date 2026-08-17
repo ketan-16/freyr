@@ -14,7 +14,10 @@
 		{ href: '/yearly', label: 'Yearly', icon: 'calendar-range' }
 	];
 
-	const settings = [{ href: '/settings/budget', label: 'Budget', icon: 'sliders-horizontal' }];
+	const settings = [
+		{ href: '/settings/budget', label: 'Budget', icon: 'sliders-horizontal' },
+		{ href: '/settings/categories', label: 'Categories', icon: 'tags' }
+	];
 
 	function current(href: string): 'page' | undefined {
 		if (href === '/') return page.url.pathname === '/' ? 'page' : undefined;

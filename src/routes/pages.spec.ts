@@ -3,6 +3,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { dayBoundIn, daysInMonth, MONTH_NAMES, prevMonth, todayISO } from '$lib/dates';
 import { activeFor, createPeriod } from '$lib/server/budgets';
+import { createCategory, getCategory, listCategories } from '$lib/server/categories';
 import { createGoal, ensureLocation } from '$lib/server/goals';
 import { createTransaction, listTransactions } from '$lib/server/ledger';
 import { createPromotion, rebuildProjectedPeriods } from '$lib/server/promotions';
@@ -12,6 +13,7 @@ import * as home from './+page.server';
 import * as ledger from './ledger/+page.server';
 import * as monthly from './monthly/+page.server';
 import * as budget from './settings/budget/+page.server';
+import * as categories from './settings/categories/+page.server';
 import * as yearly from './yearly/+page.server';
 
 let db: DatabaseSync;
@@ -62,6 +64,7 @@ describe('ledger page', () => {
 	});
 
 	it('create action inserts and redirects preserving filters', async () => {
+		const eatingOut = createCategory(db, { scope: 'wants', name: 'Eating out' });
 		await expect(
 			ledger.actions.create(
 				event('/ledger?/create&year=2026&month=7', {
@@ -69,7 +72,7 @@ describe('ledger page', () => {
 					amount: '1,250.50',
 					direction: 'outflow',
 					bucket: 'wants',
-					category: 'Eating out',
+					category: String(eatingOut),
 					note: 'dinner'
 				})
 			)
@@ -96,19 +99,20 @@ describe('ledger page', () => {
 		expect(result.data.values.amount).toBe('abc');
 	});
 
-	it('goal contributions require a location (friendly error)', async () => {
-		const goalId = createGoal(db, { name: 'Car', kind: 'goal' });
-		const result = (await ledger.actions.create(
-			event('/ledger', {
-				date: '2026-07-10',
-				amount: '100',
-				direction: 'outflow',
-				bucket: 'investments',
-				goal: String(goalId)
-			})
+	it('refuses an entry with no category, or one from another bucket', async () => {
+		const grocery = createCategory(db, { scope: 'needs', name: 'Grocery' });
+		const base = { date: '2026-07-10', amount: '100', direction: 'outflow', bucket: 'wants' };
+
+		const missing = (await ledger.actions.create(event('/ledger', base))) as any;
+		expect(missing.status).toBe(400);
+		expect(missing.data.error).toMatch(/category/i);
+
+		const mismatched = (await ledger.actions.create(
+			event('/ledger', { ...base, category: String(grocery) })
 		)) as any;
-		expect(result.status).toBe(400);
-		expect(result.data.error).toMatch(/location/i);
+		expect(mismatched.status).toBe(400);
+		expect(mismatched.data.error).toMatch(/not a wants category/i);
+		expect(listTransactions(db, {})).toHaveLength(0);
 	});
 
 	it('delete action removes the row', async () => {
@@ -617,6 +621,110 @@ describe('/settings/budget promotions', () => {
 	});
 });
 
+describe('categories settings page', () => {
+	it('load returns every category with its usage, and the scopes on offer', () => {
+		const grocery = createCategory(db, { scope: 'needs', name: 'Grocery' });
+		createTransaction(db, {
+			date: '2026-07-01',
+			amountPaise: 100,
+			direction: 'outflow',
+			bucket: 'needs',
+			categoryId: grocery
+		});
+
+		const data = categories.load(event('/settings/categories')) as any;
+		expect(data.categories).toEqual([
+			{ id: grocery, scope: 'needs', name: 'Grocery', archived: false, used: 1 }
+		]);
+		// 'other' income is never offered by the entry bar, so it is not offered here.
+		expect(data.scopes.map((s: any) => s.value)).toEqual([
+			'needs',
+			'wants',
+			'investments',
+			'job',
+			'side_hustle'
+		]);
+	});
+
+	it('add creates one, and reports a duplicate keeping what was typed', async () => {
+		await expect(
+			categories.actions.add(
+				event('/settings/categories?/add', { scope: 'wants', name: 'Eating out' })
+			)
+		).rejects.toSatisfy(isRedirect);
+		expect(listCategories(db).map((c) => c.name)).toEqual(['Eating out']);
+
+		const result = (await categories.actions.add(
+			event('/settings/categories?/add', { scope: 'wants', name: 'Eating out' })
+		)) as any;
+		expect(result.status).toBe(400);
+		expect(result.data.failed).toBe('add');
+		expect(result.data.error).toMatch(/already exists/i);
+		expect(result.data.values.name).toBe('Eating out');
+	});
+
+	it('rename keeps the transactions filed under it', async () => {
+		const id = createCategory(db, { scope: 'wants', name: 'Eating out' });
+		createTransaction(db, {
+			date: '2026-07-01',
+			amountPaise: 100,
+			direction: 'outflow',
+			bucket: 'wants',
+			categoryId: id
+		});
+
+		await expect(
+			categories.actions.rename(
+				event('/settings/categories?/rename', { id: String(id), name: 'Dining' })
+			)
+		).rejects.toSatisfy(isRedirect);
+		expect(listTransactions(db, {})[0].categoryName).toBe('Dining');
+	});
+
+	it('archive hides a category from the entry bar and restores it', async () => {
+		const id = createCategory(db, { scope: 'wants', name: 'Eating out' });
+
+		await expect(
+			categories.actions.archive(
+				event('/settings/categories?/archive', { id: String(id), archived: '1' })
+			)
+		).rejects.toSatisfy(isRedirect);
+		expect(listCategories(db)).toHaveLength(0);
+
+		await expect(
+			categories.actions.archive(
+				event('/settings/categories?/archive', { id: String(id), archived: '0' })
+			)
+		).rejects.toSatisfy(isRedirect);
+		expect(listCategories(db)).toHaveLength(1);
+	});
+
+	it('delete removes an unused one and refuses a used one', async () => {
+		const spare = createCategory(db, { scope: 'wants', name: 'Spare' });
+		const used = createCategory(db, { scope: 'wants', name: 'Eating out' });
+		createTransaction(db, {
+			date: '2026-07-01',
+			amountPaise: 100,
+			direction: 'outflow',
+			bucket: 'wants',
+			categoryId: used
+		});
+
+		await expect(
+			categories.actions.delete(event('/settings/categories?/delete', { id: String(spare) }))
+		).rejects.toSatisfy(isRedirect);
+		expect(getCategory(db, spare)).toBeNull();
+
+		const result = (await categories.actions.delete(
+			event('/settings/categories?/delete', { id: String(used) })
+		)) as any;
+		expect(result.status).toBe(400);
+		expect(result.data.failed).toBe('delete');
+		expect(result.data.error).toMatch(/archive it instead/i);
+		expect(getCategory(db, used)).not.toBeNull();
+	});
+});
+
 describe('home page', () => {
 	it('returns month summary, goal progress and lendings total', () => {
 		const goalId = createGoal(db, { name: 'Car', kind: 'goal', targetPaise: 70000000 });
@@ -729,6 +837,7 @@ describe('home command centre', () => {
 	});
 
 	it('create action inserts and redirects home', async () => {
+		const eatingOut = createCategory(db, { scope: 'wants', name: 'Eating out' });
 		await expect(
 			home.actions.create(
 				event('/?/create', {
@@ -736,7 +845,7 @@ describe('home command centre', () => {
 					amount: '1,250.50',
 					direction: 'outflow',
 					bucket: 'wants',
-					category: 'Eating out'
+					category: String(eatingOut)
 				})
 			)
 		).rejects.toSatisfy((e: unknown) => isRedirect(e) && e.location === '/');

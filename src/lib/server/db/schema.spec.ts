@@ -119,6 +119,54 @@ describe('transactions CHECK constraints', () => {
 	});
 });
 
+describe('0004 categories schema', () => {
+	const insert = (scope: string, name: string) =>
+		db.prepare('INSERT INTO categories (scope, name) VALUES (?, ?)').run(scope, name);
+
+	it('scopes the name, so one word can serve two buckets', () => {
+		insert('needs', 'Travel');
+		insert('wants', 'Travel');
+		expect(() => insert('wants', 'Travel')).toThrow();
+	});
+
+	it('rejects a scope outside the bucket and income-source enums', () => {
+		expect(() => insert('rent', 'Flat')).toThrow();
+	});
+
+	it('rejects a blank name', () => {
+		expect(() => insert('needs', '   ')).toThrow();
+	});
+
+	it('defaults to not archived, and only takes 0 or 1', () => {
+		insert('needs', 'Grocery');
+		const row = db.prepare("SELECT archived FROM categories WHERE name = 'Grocery'").get() as {
+			archived: number;
+		};
+		expect(row.archived).toBe(0);
+		expect(() =>
+			db.prepare("UPDATE categories SET archived = 2 WHERE name = 'Grocery'").run()
+		).toThrow();
+	});
+
+	it('clears the label off a transaction rather than blocking the delete', () => {
+		insert('wants', 'Eating out');
+		insertTxn({
+			date: '2026-07-01',
+			amount_paise: 100,
+			direction: 'outflow',
+			bucket: 'wants',
+			category_id: 1
+		});
+		// The domain refuses this; the schema's job is only to leave no dangling
+		// reference behind if it ever happens.
+		db.prepare('DELETE FROM categories WHERE id = 1').run();
+		const row = db.prepare('SELECT category_id FROM transactions').get() as {
+			category_id: number | null;
+		};
+		expect(row.category_id).toBeNull();
+	});
+});
+
 describe('budget_periods CHECK constraints', () => {
 	it('accepts basis points summing to 10000, rejects others', () => {
 		db.prepare(

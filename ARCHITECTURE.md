@@ -38,8 +38,10 @@ src/lib/server/db/             — open (WAL, busy_timeout, foreign_keys), migra
                                  SQLITE_CONSTRAINT_UNIQUE; migrations bundled via Vite
                                  ?raw glob (fs fallback for tsx)
 src/lib/server/auth.ts         — users (bcryptjs), sessions (sha256 token at rest, 90d)
-src/lib/server/ledger.ts       — transactions CRUD + validation, categories,
+src/lib/server/ledger.ts       — transactions CRUD + validation,
                                  monthly/yearly rollups (conditional aggregation, one query)
+src/lib/server/categories.ts   — categories scoped to a bucket or an income source:
+                                 list/create/rename/archive/delete, usage counts
 src/lib/server/budgets.ts      — budget periods (basis points), activeFor/periodFor,
                                  allocate, monthSummary and yearlyAllocation
                                  (allocated/actual/remaining per bucket)
@@ -59,14 +61,16 @@ src/lib/server/importer/       — one-time Excel seed import (exceljs), per-she
                                  single transaction, idempotent-by-refusal
 src/routes/                    — thin +page.server.ts (parse → domain → return/redirect):
                                  / (home), /ledger, /monthly, /yearly, /settings/budget,
-                                 /login, /setup, /logout, /theme (POST: set cookie, bounce back)
+                                 /settings/categories, /login, /setup, /logout,
+                                 /theme (POST: set cookie, bounce back)
 scripts/import.ts              — CLI import entry (tsx) with verification report
 scripts/dump-workbook.ts       — dev utility: dump an xlsx's raw cell layout
 ```
 
 ## Data model
 
-SQLite, three migrations (`0001_auth`, `0002_domain`, `0003_promotions`). Money columns are
+SQLite, four migrations (`0001_auth`, `0002_domain`, `0003_promotions`, `0004_categories`).
+Money columns are
 `INTEGER` paise; percentages `INTEGER` basis points (27.20% → 2720); dates `TEXT` ISO-8601.
 
 - **transactions** — the heart. Every money movement is one row: salary in, expense out,
@@ -74,6 +78,14 @@ SQLite, three migrations (`0001_auth`, `0002_domain`, `0003_promotions`). Money 
   lending id). CHECK constraints enforce: amount > 0; income ⇔ no bucket ∧ has source;
   outflow ⇔ has bucket ∧ no source; goal and location together or not at all. All views
   derive from this table.
+- **categories** — every transaction is filed under one, and each category belongs to one
+  `scope`: a bucket (`needs`/`wants`/`investments`) for outflows, or an income source
+  (`job`/`side_hustle`/`other`) for income. `UNIQUE(scope, name)`, so "Travel" can exist
+  under both Needs and Wants. That a row's category matches its own bucket or source is the
+  one invariant no CHECK can hold — it spans two tables — so `txn-form.ts` enforces it, and
+  nothing else writes `category_id`. Categories are archived rather than deleted once used:
+  `category_id` is `ON DELETE SET NULL`, so a delete would strip the label off history; the
+  domain refuses it and settings only offers delete at zero usage.
 - **budget_policy / promotions** — the source of truth for the splits. One policy row (base
   triple + raise triple + a base effective date) and one row per raise (date, increment in
   bp, note; `UNIQUE(effective_date)`).
@@ -85,7 +97,9 @@ SQLite, three migrations (`0001_auth`, `0002_domain`, `0003_promotions`). Money 
   date (`UNIQUE(effective_from, source)`), so a hand-typed correction to one month survives
   any number of rebuilds.
 - **goals / locations / goal_moves** — goals and pots unified by `kind`; placement tracked
-  by location-tagged contributions (moves UI lands in Phase 2).
+  by location-tagged contributions. Only the import writes them: the entry bar dropped its
+  goal and location fields when the ledger became daily-entry-first, so goal progress
+  reflects imported history until a goals UI lands (Phase 2).
 - **lendings, insurance_policies(+premiums), big_purchases, cards(+rewards), sip_plans
   (+funds), emergency_fund_plans(+items), salary_projections** — registry/planner tables,
   populated by the import now, UI in Phases 2–4.

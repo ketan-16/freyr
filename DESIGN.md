@@ -530,6 +530,7 @@ _markup_ repeats across pages (those names are real paths under `src/lib/compone
 | `button-secondary`   | the `button` element's own style                                                         |
 | `button-ghost`       | `button.ghost`                                                                           |
 | `button-danger-icon` | `button.icon`                                                                            |
+| `input-row`          | `input.row-input` — an editable table cell; `.cell-actions` groups a row's buttons       |
 | `notice`             | `.notice` — literal                                                                      |
 | `error-text`         | `.error`                                                                                 |
 | `auth-shell`         | `.auth`                                                                                  |
@@ -554,11 +555,11 @@ returns. Renders the fill and, over the cap, the excess segment; renders `—` w
 allocation to measure against.
 
 **`EntryBar.svelte`** — The whole `entry-bar` form, shared by `/ledger` and home so the two cannot
-drift. Owns the direction-dependent fields (bucket/category/goal/location vs source), the
-`use:enhance` handler that refocuses the amount field after a submit, and the form-level
-`error-text`. It is a `<details open>` whose `<summary>` is hidden on desktop and becomes a 44px
-disclosure below `40rem`, so a phone can put the table first without eight fields pushing it
-off-screen.
+drift. Owns the direction-dependent fields — a bucket for an outflow, a source for income, and a
+category select narrowed to whichever of the two was picked — the `use:enhance` handler that
+refocuses the amount field after a submit, and the form-level `error-text`. It is a
+`<details open>` whose `<summary>` is hidden on desktop and becomes a 44px disclosure below
+`40rem`, so a phone can put the table first without a stack of fields pushing it off-screen.
 
 **`Icon.svelte`** — The Lucide subset as inline path data, one `<svg>` at 16px and 1.5px stroke on
 `currentColor`. The single gate on "one icon set, used consistently".
@@ -882,7 +883,7 @@ Stated per control class and **measured against `src/app.css`**, not asserted as
   up from the 32px `--control-h` that desktop uses. They are full-width or text-labelled, so the
   target is a wide band and only the height is under 44: that clears WCAG 2.2 AA's 24×24 minimum with
   room to spare, where 44×44 is the AAA figure. Raising it would spend 8px per control on the densest
-  screens in the app — `entry-bar` stacks eight of them on a phone — to enlarge targets nobody misses.
+  screens in the app — `entry-bar` stacks seven of them on a phone — to enlarge targets nobody misses.
   A deliberate, measured exception; re-measure before changing that rule, and change the doc with it.
 - The bottom tab bar reserves `env(safe-area-inset-bottom)`.
 - Hover styles are wrapped in `@media (hover: hover)` so touch devices don't get sticky hover states.

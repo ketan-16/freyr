@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { goalProgress } from '../goals';
-import { listCategories, listTransactions, monthlyActuals } from '../ledger';
+import { listCategories } from '../categories';
+import { listTransactions, monthlyActuals } from '../ledger';
 import { openLendingsTotal } from '../registry';
 import { testDb } from '../test-db';
 import { AlreadyImportedError, runImport } from './index';
@@ -289,11 +290,12 @@ describe('runImport', () => {
 		}[];
 		expect(funds.map((f) => f.pct_bp)).toEqual([5000, 5000]);
 
-		// Emergency items seed categories, except the "Wants" bucket name.
-		const names = listCategories(db).map((c) => c.name);
-		expect(names).toContain('Bike EMI');
-		expect(names).toContain('Grocery');
-		expect(names).not.toContain('Wants');
+		// Emergency items seed needs categories, except the "Wants" bucket name.
+		const seeded = listCategories(db);
+		expect(seeded.map((c) => c.name)).toContain('Bike EMI');
+		expect(seeded.map((c) => c.name)).toContain('Grocery');
+		expect(seeded.map((c) => c.name)).not.toContain('Wants');
+		expect(seeded.every((c) => c.scope === 'needs')).toBe(true);
 		const plan = db.prepare('SELECT planned_months FROM emergency_fund_plans').get() as {
 			planned_months: number;
 		};

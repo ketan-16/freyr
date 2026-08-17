@@ -1,6 +1,6 @@
 import type ExcelJS from 'exceljs';
 import type { DatabaseSync } from 'node:sqlite';
-import { ensureCategory } from '../ledger';
+import { ensureCategory } from '../categories';
 import {
 	insertBigPurchase,
 	insertCard,
@@ -178,7 +178,9 @@ export function importEmergencyFund(db: DatabaseSync, ws: ExcelJS.Worksheet, rep
 		if (paise == null || paise <= 0) return;
 		insertEmergencyItem(db, name, paise);
 		report.emergencyItems = (report.emergencyItems ?? 0) + 1;
-		if (!/^wants$/i.test(name)) ensureCategory(db, name);
+		// Emergency-fund items are the monthly expenses that must be covered, so
+		// they seed the needs list rather than any other scope.
+		if (!/^wants$/i.test(name)) ensureCategory(db, 'needs', name);
 	});
 	if (months != null && months > 0) setEmergencyPlan(db, months);
 	else report.notes.push('Emergency Fund: no planned-months value found.');

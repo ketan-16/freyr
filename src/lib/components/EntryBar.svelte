@@ -4,13 +4,10 @@
   appears where the eye already is (DESIGN.md § entry-bar).
 -->
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
-	import type { Category } from '$lib/server/ledger';
-
-	interface Named {
-		id: number;
-		name: string;
-	}
+	import type { Category, CategoryScope } from '$lib/server/categories';
+	import type { Bucket, Direction, Source } from '$lib/server/ledger';
 
 	let {
 		action,
@@ -19,7 +16,7 @@
 		error
 	}: {
 		action: string;
-		entry: { today: string; categories: Category[]; goals: Named[]; locations: Named[] };
+		entry: { today: string; categories: Category[] };
 		values?: Record<string, string>;
 		/**
 		 * The failed submission's message. It lives here rather than beside the
@@ -31,7 +28,25 @@
 	} = $props();
 
 	let amountInput: HTMLInputElement | undefined = $state();
-	let direction = $state('outflow');
+
+	/**
+	 * Seeded once from the last submission, then owned by the selects. It is
+	 * read untracked because a later `values` must not move a control the user
+	 * is looking at: with JS the failed submit leaves their answers on screen,
+	 * and without it the server re-renders a fresh component that seeds here.
+	 */
+	const posted = untrack(() => values) ?? {};
+	let direction = $state<Direction>((posted.direction as Direction) ?? 'outflow');
+	let bucket = $state<Bucket>((posted.bucket as Bucket) ?? 'needs');
+	let source = $state<Source>((posted.source as Source) ?? 'job');
+
+	/**
+	 * A category belongs to one bucket or one income source, so the answer just
+	 * given decides the list. Every category ships with the page and the filter
+	 * runs here: changing bucket re-narrows the dropdown with no round trip.
+	 */
+	const scope = $derived<CategoryScope>(direction === 'income' ? source : bucket);
+	const options = $derived(entry.categories.filter((c) => c.scope === scope));
 </script>
 
 <details class="entry-wrap" open>
@@ -74,31 +89,10 @@
 		{#if direction === 'outflow'}
 			<div class="field">
 				<label for="e-bucket">Bucket</label>
-				<select id="e-bucket" name="bucket">
+				<select id="e-bucket" name="bucket" bind:value={bucket}>
 					<option value="needs">Needs</option>
 					<option value="wants">Wants</option>
 					<option value="investments">Investments</option>
-				</select>
-			</div>
-			<div class="field">
-				<label for="e-category">Category</label>
-				<input id="e-category" name="category" list="categories" value={values?.category ?? ''} />
-				<datalist id="categories">
-					{#each entry.categories as c (c.id)}<option value={c.name}></option>{/each}
-				</datalist>
-			</div>
-			<div class="field">
-				<label for="e-goal">Goal</label>
-				<select id="e-goal" name="goal">
-					<option value="">—</option>
-					{#each entry.goals as g (g.id)}<option value={g.id}>{g.name}</option>{/each}
-				</select>
-			</div>
-			<div class="field">
-				<label for="e-location">Location</label>
-				<select id="e-location" name="location">
-					<option value="">—</option>
-					{#each entry.locations as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
 				</select>
 			</div>
 		{:else}
@@ -111,18 +105,38 @@
 				  awaiting income. The enum keeps 'other' for imported rows; do not
 				  offer it until the rollups count it.
 				-->
-				<select id="e-source" name="source">
+				<select id="e-source" name="source" bind:value={source}>
 					<option value="job">Job</option>
 					<option value="side_hustle">Side hustle</option>
 				</select>
 			</div>
 		{/if}
+		<div class="field">
+			<label for="e-category">Category</label>
+			<!--
+			  Required, and empty when the scope has no categories yet: the browser
+			  blocks the submit on the placeholder, and the notice below says where
+			  to add one.
+			-->
+			<select id="e-category" name="category" required>
+				{#each options as c (c.id)}
+					<option value={c.id} selected={values?.category === String(c.id)}>{c.name}</option>
+				{:else}
+					<option value="" disabled selected>—</option>
+				{/each}
+			</select>
+		</div>
 		<div class="field grow">
 			<label for="e-note">Note</label>
 			<input id="e-note" name="note" value={values?.note ?? ''} autocomplete="off" />
 		</div>
 		<button class="primary" type="submit">Add</button>
 	</form>
+	{#if !options.length}
+		<p class="notice">
+			Nothing to file this under yet — <a href="/settings/categories">add a category</a>.
+		</p>
+	{/if}
 	<!--
 	  Outside the flex form so it takes its own line, and announced on insertion:
 	  the failed submit returns focus to the amount field, which describes itself
