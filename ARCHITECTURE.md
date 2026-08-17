@@ -19,10 +19,12 @@ src/hooks.server.ts            — boot: open+migrate db once, rebuild the budge
                                  theme cookie → <html data-theme> via transformPageChunk,
                                  hourly backup timer
 src/app.css                    — the whole stylesheet: design tokens (both themes),
-                                 shell, tables, forms, responsive rules. Implements DESIGN.md
+                                 shell, page head, panel grid, tables (column rhythm),
+                                 forms, responsive rules. Implements DESIGN.md
 src/lib/money.ts               — integer-paise money: parse ("1,23,456.78" → paise),
                                  Indian-grouped format, basis-point math (mulBP)
-src/lib/dates.ts               — YYYY-MM-DD string helpers (no Date-object state)
+src/lib/dates.ts               — YYYY-MM-DD string helpers (no Date-object state), plus
+                                 the display labels monthLabel and shortDate
 src/lib/format.ts              — figure presentation: formatCell (zero → em dash, inflows
                                  signed) and delta (arrow = direction, class = good news)
 src/lib/progress.ts            — meter thresholds (brand <80%, amber 80–100%, loss >100%)
@@ -174,6 +176,18 @@ from a raw dump of the real workbook:
   properties; the dark theme re-declares them under `[data-theme='dark']` and again inside a
   `prefers-color-scheme` block for the no-cookie case. The duplication is deliberate — the
   alternative is a class-swap that flashes or a build step the stack rules out.
+- **Table columns are content-sized, with one nominated absorber per table.** Cells are
+  `width: 1%` and nowrap; the one column carrying `.grow` takes the slack and is the only one
+  allowed to wrap. A 100%-wide auto-layout table otherwise hands its slack to whichever column
+  will take it, which on a wide screen put a row's name and its figures a full display apart.
+  A table of pure figures nominates no absorber and its panel takes `.tight` instead, becoming
+  content-width so the leftover is gutter. The phone reflow overrides both rules, because
+  there the cells are a card's lines rather than columns.
+- **Sections are laid out by a CSS grid, not by breakpoints.** `.panels` is
+  `repeat(auto-fit, minmax(min(36rem, 100%), 1fr))`, so two tables sit side by side exactly
+  when two will fit and stack otherwise — at any window size and any zoom level, with no media
+  query to keep in sync. The `min(…, 100%)` is load-bearing: an auto-fit track keeps its floor
+  even in a narrower container, which would overflow a phone by the difference.
 - **Tables reflow to cards on phones with the same markup.** `data-label` attributes drive
   `::before` labels below 40rem; cells whose value is absent omit the attribute and are
   hidden, so there is no second mobile template to keep in sync. The cost is that "no

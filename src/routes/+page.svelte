@@ -3,7 +3,7 @@
 	import EntryBar from '$lib/components/EntryBar.svelte';
 	import Meter from '$lib/components/Meter.svelte';
 	import Money from '$lib/components/Money.svelte';
-	import { monthLabel } from '$lib/dates';
+	import { monthLabel, shortDate } from '$lib/dates';
 	import { formatCell } from '$lib/format';
 	import { formatMoney } from '$lib/money';
 	import { meter } from '$lib/progress';
@@ -43,7 +43,7 @@
 
 <div class="page-head">
 	<h1>{monthLabel(s.year, s.month)}</h1>
-	<span class="muted">This month</span>
+	<span class="context">This month</span>
 </div>
 
 {#if hasAllocationBasis}
@@ -99,130 +99,174 @@
 	</p>
 {/if}
 
-<h2>Buckets</h2>
-<div class="table-wrap">
-	<table>
-		<thead>
-			<tr>
-				<th scope="col">Bucket</th>
-				<th scope="col">Used</th>
-				<th scope="col" class="num">Allocated</th>
-				<th scope="col" class="num">Actual</th>
-				<th scope="col" class="num">Remaining</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each s.rows as row (row.bucket)}
-				{@const m = meter(row.actual, row.allocated)}
-				<tr>
-					<td data-label="Bucket">{row.label}</td>
-					<td data-label="Used">
-						<span class="meter-cell">
-							<Meter value={m} />
-							<span class="pct">{m ? `${m.pct}%` : ''}</span>
-						</span>
-					</td>
-					<td data-label="Allocated" class="num amount">
-						<Money value={row.allocated ?? 0} />
-					</td>
-					<td data-label="Actual" class="num amount"><Money value={row.actual} /></td>
-					<!--
-					  Before income lands there is no allocation to have anything left of,
-					  so remaining is not "0 − actual" overspend — it is nothing yet. The
-					  whole point of the awaiting-income state is to not read as three
-					  blown budgets before payday.
-					-->
-					<td
-						data-label="Remaining"
-						class="num amount {data.awaitingIncome || row.remaining == null
-							? ''
-							: row.remaining < 0
-								? 'neg'
-								: ''}"
-					>
-						{#if data.awaitingIncome}
-							<span class="faint">—</span>
-						{:else}
-							<Money value={row.remaining ?? 0} />
-						{/if}
-					</td>
-				</tr>
-			{/each}
-		</tbody>
-	</table>
+<!--
+  Three figures the headline does not already carry: it reports what is left,
+  of what was allocated, with how many days to go. A tile repeating one of
+  those would print a single fact under two labels. Lendings outstanding was a
+  loose line at the foot of the page before — it is a standing figure, so it
+  belongs with the standing figures.
+-->
+<div class="kpis">
+	<div class="kpi">
+		<div class="label">Income</div>
+		<!-- Green only ever arrives with a sign: the money-cell convention carries
+		     the `+`, so the tile reads the same way as the rows beneath it. -->
+		<div class="value"><Money value={s.income} direction="income" /></div>
+	</div>
+	<div class="kpi">
+		<div class="label">Spent</div>
+		<div class="value"><Money value={data.spent} /></div>
+	</div>
+	<div class="kpi">
+		<div class="label">Lendings out</div>
+		<div class="value"><Money value={data.lendingsOutstanding} /></div>
+	</div>
 </div>
 
-<h2>Add</h2>
-<EntryBar action="?/create" entry={data.entry} values={form?.values} error={form?.error} />
+<div class="panels">
+	<section class="panel">
+		<div class="panel-head"><h2>Buckets</h2></div>
+		<div class="table-wrap">
+			<table>
+				<thead>
+					<tr>
+						<th scope="col" class="grow">Bucket</th>
+						<th scope="col">Used</th>
+						<th scope="col" class="num">Allocated</th>
+						<th scope="col" class="num">Actual</th>
+						<th scope="col" class="num">Remaining</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each s.rows as row (row.bucket)}
+						{@const m = meter(row.actual, row.allocated)}
+						<tr>
+							<td data-label="Bucket" class="grow">{row.label}</td>
+							<td data-label="Used">
+								<span class="meter-cell">
+									<Meter value={m} />
+									<span class="pct">{m ? `${m.pct}%` : ''}</span>
+								</span>
+							</td>
+							<td data-label="Allocated" class="num amount">
+								<Money value={row.allocated ?? 0} />
+							</td>
+							<td data-label="Actual" class="num amount"><Money value={row.actual} /></td>
+							<!--
+							  Before income lands there is no allocation to have anything left of,
+							  so remaining is not "0 − actual" overspend — it is nothing yet. The
+							  whole point of the awaiting-income state is to not read as three
+							  blown budgets before payday.
+							-->
+							<td
+								data-label="Remaining"
+								class="num amount {data.awaitingIncome || row.remaining == null
+									? ''
+									: row.remaining < 0
+										? 'neg'
+										: ''}"
+							>
+								{#if data.awaitingIncome}
+									<span class="faint">—</span>
+								{:else}
+									<Money value={row.remaining ?? 0} />
+								{/if}
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</section>
 
-<h2>Recent</h2>
-<div class="table-wrap">
-	<table>
-		<thead>
-			<tr>
-				<th scope="col">Date</th>
-				<th scope="col" class="num">Amount</th>
-				<th scope="col">Type</th>
-				<th scope="col">Category</th>
-				<th scope="col">Note</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each data.recent as t (t.id)}
-				<tr>
-					<td data-label="Date" class="num">{t.date}</td>
-					<td data-label="Amount" class="num amount">
-						<Money value={t.amountPaise} direction={t.direction} />
-					</td>
-					<td data-label="Type">
-						{#if t.direction === 'income'}
-							<span class="tag">income</span>
-						{:else}
-							<span class="tag">{t.bucket}</span>
-						{/if}
-					</td>
-					<td data-label={t.categoryName ? 'Category' : null}>{t.categoryName ?? ''}</td>
-					<td data-label={t.note ? 'Note' : null} class="muted">{t.note ?? ''}</td>
-				</tr>
-			{:else}
-				<tr><td class="empty" colspan="5">Nothing recorded yet.</td></tr>
-			{/each}
-		</tbody>
-	</table>
+	<section class="panel">
+		<div class="panel-head"><h2>Goals</h2></div>
+		<div class="table-wrap">
+			<table>
+				<thead>
+					<tr>
+						<th scope="col" class="grow">Goal</th>
+						<th scope="col">Progress</th>
+						<th scope="col" class="num">Saved</th>
+						<th scope="col" class="num">Target</th>
+						<th scope="col" class="num">%</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.goals as g (g.goal.id)}
+						{@const m = meter(g.contributed, g.goal.targetPaise)}
+						<tr>
+							<td data-label="Goal" class="grow">
+								{g.goal.name}
+								{#if g.goal.kind === 'pot'}<span class="tag">pot</span>{/if}
+							</td>
+							<td data-label="Progress"><Meter value={m} /></td>
+							<td data-label="Saved" class="num amount"><Money value={g.contributed} /></td>
+							<td data-label="Target" class="num amount">
+								<Money value={g.goal.targetPaise ?? 0} />
+							</td>
+							<td data-label="%" class="num">{m ? `${m.pct}%` : '—'}</td>
+						</tr>
+					{:else}
+						<tr><td class="empty" colspan="5">No goals yet.</td></tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</section>
+
+	<!--
+	  The entry bar is a toolbar for the table below it, not a section of its
+	  own — it spans the same width as the rows it writes, so a new row appears
+	  where the eye already is (DESIGN.md § entry-bar). It used to sit under an
+	  "Add" heading two tables away from the one it feeds.
+	-->
+	<div class="wide">
+		<EntryBar action="?/create" entry={data.entry} values={form?.values} error={form?.error} />
+	</div>
+
+	<section class="panel wide">
+		<div class="panel-head">
+			<h2>Recent</h2>
+			<span class="meta"><a href="/ledger">All transactions</a></span>
+		</div>
+		<div class="table-wrap">
+			<table>
+				<thead>
+					<tr>
+						<th scope="col" class="date">Date</th>
+						<th scope="col" class="num">Amount</th>
+						<th scope="col">Type</th>
+						<th scope="col">Category</th>
+						<th scope="col" class="grow">Note</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.recent as t (t.id)}
+						<tr>
+							<!--
+							  Recent crosses month ends, so the year is passed as the context the
+							  screen is scoped to and printed only on a row that falls outside it.
+							-->
+							<td data-label="Date" class="date">{shortDate(t.date, s.year)}</td>
+							<td data-label="Amount" class="num amount">
+								<Money value={t.amountPaise} direction={t.direction} />
+							</td>
+							<td data-label="Type">
+								{#if t.direction === 'income'}
+									<span class="tag">income</span>
+								{:else}
+									<span class="tag">{t.bucket}</span>
+								{/if}
+							</td>
+							<td data-label={t.categoryName ? 'Category' : null}>{t.categoryName ?? ''}</td>
+							<td data-label={t.note ? 'Note' : null} class="muted grow">{t.note ?? ''}</td>
+						</tr>
+					{:else}
+						<tr><td class="empty" colspan="5">Nothing recorded yet.</td></tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</section>
 </div>
-
-<h2>Goals</h2>
-<div class="table-wrap">
-	<table>
-		<thead>
-			<tr>
-				<th scope="col">Goal</th>
-				<th scope="col">Progress</th>
-				<th scope="col" class="num">Saved</th>
-				<th scope="col" class="num">Target</th>
-				<th scope="col" class="num">%</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each data.goals as g (g.goal.id)}
-				{@const m = meter(g.contributed, g.goal.targetPaise)}
-				<tr>
-					<td data-label="Goal">
-						{g.goal.name}
-						{#if g.goal.kind === 'pot'}<span class="tag">pot</span>{/if}
-					</td>
-					<td data-label="Progress"><Meter value={m} /></td>
-					<td data-label="Saved" class="num amount"><Money value={g.contributed} /></td>
-					<td data-label="Target" class="num amount">
-						<Money value={g.goal.targetPaise ?? 0} />
-					</td>
-					<td data-label="%" class="num">{m ? `${m.pct}%` : '—'}</td>
-				</tr>
-			{:else}
-				<tr><td class="empty" colspan="5">No goals yet.</td></tr>
-			{/each}
-		</tbody>
-	</table>
-</div>
-
-<p class="hero-sub">Lendings outstanding {formatCell(data.lendingsOutstanding)}</p>

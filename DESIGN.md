@@ -323,10 +323,37 @@ difference between a 29px row and a 37px one, which is four extra transactions o
 - **Shell:** rail (fixed) + main (fluid). No right rail — Freyr's screens are one table wide.
 - **Main max width:** `100rem` (1600px). Beyond that, tables get gutters rather than stretching; a
   2400px-wide transaction row is unreadable.
+- **Sections:** a `panels` grid, `repeat(auto-fit, minmax(min(--panel-min, 100%), 1fr))` with
+  `--panel-min` at `36rem`. Screens wide enough for two tables get two; narrower ones get one. The
+  wrap point follows the container, so it holds at any zoom level without a breakpoint.
 - **Forms:** capped at `36rem` when standalone (auth). The ledger entry bar is full-width by design —
   it is a toolbar, not a form.
 - **Tables:** `width: 100%`, `table-layout: auto`. The amount column gets a `min-width` so it never
   collapses under a long note.
+
+#### Column rhythm
+
+Every cell is `width: 1%` and `white-space: nowrap`; exactly one column per table carries `.grow`,
+which is `width: auto` and the only column allowed to wrap.
+
+This exists because a 100%-wide auto-layout table hands its slack to whichever column will take it.
+On a 1440px screen that put a bucket's name at x=225 and its Remaining at x=1400 — a row you have to
+read across the whole display — and right-aligned a `2026-08-08` some 350px from its own row's left
+edge with a void beside it. Asking every column for its content's width and nominating one absorber
+keeps a figure beside the row it describes at any width.
+
+The nominated column is the one that genuinely wants room: a note, or the row's name. A table of
+pure figures nominates none and takes `.tight` instead.
+
+- **`.tight`** — `width: fit-content` on the panel and `width: auto` on its table. For a table whose
+  columns all want their content and nothing more (monthly's six-column bucket table). The panel
+  takes what it needs and the rest of the screen becomes gutter, which is this section's rule applied
+  at the panel instead of at the shell.
+- **`.wide`** — `grid-column: 1 / -1`. For a table that earns the whole measure (the ledger's seven
+  columns with real notes) and for the entry bar, which must span the table it writes to.
+
+The phone reflow overrides both the `1%` and the nowrap: below `40rem` cells are a card's lines, not
+columns, and the column rhythm would collapse every line and clip every note.
 
 ### Whitespace philosophy
 
@@ -401,6 +428,10 @@ _markup_ repeats across pages (those names are real paths under `src/lib/compone
 | `topbar`             | `.topbar` — literal, label in `.topbar-title`                                            |
 | `tabbar-mobile`      | `.tabbar`                                                                                |
 | `theme-toggle`       | no class of its own — `ThemeToggle.svelte`; `.rail-btn` in the rail, bare above it       |
+| `page-head`          | `.page-head`, with `.context` and the `.actions` cluster                                 |
+| `panel-grid`         | `.panels`, with the `.wide` and `.tight` modifiers on its children                       |
+| `panel`              | `.panel`, head in `.panel-head` (+ `.meta`), prose in `.panel-body`                      |
+| `prose`              | `.prose`                                                                                 |
 | `kpi-strip`          | `.kpis`                                                                                  |
 | `kpi-tile`           | `.kpi`, with `.label` and `.value`                                                       |
 | `data-table`         | the bare `table` / `th` / `td` elements; `.table-wrap` is the scroller around it         |
@@ -410,7 +441,7 @@ _markup_ repeats across pages (those names are real paths under `src/lib/compone
 | `progress-meter`     | `.meter` (+ `.warn` / `.over`, `.fill`, `.over-seg`); `.meter-cell` pairs it with `.pct` |
 | `goal-row`           | no class — a `<tr>` in home's goals table                                                |
 | `month-stepper`      | `.stepper`, label in `.stepper .current`                                                 |
-| `filter-bar`         | `.toolbar` — a `<form>` on `/ledger`, a `<div>` on `/monthly`                            |
+| `filter-bar`         | `.page-head .actions` — a `<form>` on `/ledger` and `/yearly`                            |
 | `sparkline`          | not built — see Known Gaps                                                               |
 | `empty-state`        | `.empty`; the phone layout adds `tbody td.empty`                                         |
 | `entry-bar`          | `.entry`, inside the `.entry-wrap` disclosure                                            |
@@ -497,19 +528,56 @@ and redirects back. Sun icon in dark mode, moon in light. Label
 is `aria-label="Switch to light theme"` / `"Switch to dark theme"` — the icon shows the destination,
 the label says it out loud.
 
+### Page structure
+
+**`page-head`** — Every screen opens the same way: `h1`, an optional `context` naming the period or
+scope it is showing, then an `actions` cluster pushed right with `margin-left: auto`. A hairline
+bottom edge closes the band. The screen's own controls — the ledger's filters, the yearly year
+select, the month stepper — all live in `actions`, so the control corner is in one place on every
+page and the eye only has to learn it once.
+
+**`panel`** — The section container: `--surface`, 1px `--line`, `--r-2`. A `panel-head` carrying an
+`h2` and an optional right-aligned `meta` (a count, a total, a link to the full table), then the
+table or the `panel-body` prose. A table inside sheds its own border and fill — the panel has
+already drawn them, and a second box 1px inside the first is not depth, it is a mistake.
+
+Before this existed, a section was a bare uppercase `h2` floating above an unrelated bordered table,
+which is why home could put an "Add" heading between two tables and strand a Lendings line at the
+foot of the page. On a phone the panel drops its box: the rows have already become cards, and a
+border around a stack of bordered cards is noise. The head stays — it is the only thing naming the
+section there.
+
+**`prose`** — The explanatory paragraph a screen needs to define a column before the reader meets
+the figures (yearly's Allocated share, the budget policy's asymptote). `--t-body` in `--ink-muted`,
+capped at `68ch`. The cap is the whole point: these previously ran the full width of the page, which
+is about 180 characters and unreadable as prose.
+
 ### Data display
 
-**`kpi-strip`** — `display: flex; gap: --space-3; flex-wrap: wrap`. The row of summary tiles at the
-top of a screen. Wraps rather than scrolls.
+**`kpi-strip`** — `display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 14rem))`.
+The row of summary tiles at the top of a screen. Equal tracks so the figures line up down a column,
+capped at `14rem` so three tiles on a wide screen stay a strip rather than stretching into three
+quarter-page banners. One per row below `40rem`.
 
-**`kpi-tile`** — `--surface`, 1px `--line`, `--r-2`, `--space-3` padding, `min-width: 11rem`. Two
-lines only: `--t-label` in `--ink-muted`, then `--t-figure` tabular in `--ink`. An optional third
-element is a `delta-cell`. Never an icon — a big icon in a stat card is filler.
+**`kpi-tile`** — `--surface`, 1px `--line`, `--r-2`, `--space-3` padding. Two lines only:
+`--t-label` in `--ink-muted`, then `--t-figure` tabular in `--ink`. An optional third element is a
+`delta-cell`. Never an icon — a big icon in a stat card is filler.
+
+A tile may not repeat a figure the screen's `hero` already carries. Home's headline reports what is
+left, of what was allocated, with how many days to go, so its tiles are income, spent and lendings
+outstanding — three facts the sentence does not state. The same figure under two labels reads as two
+facts.
 
 **`data-table`** — `--surface`, 1px `--line`, `--r-2`, `border-collapse: collapse`. `--t-body`.
 Header row is `--sunk`, `--t-label`, uppercase, `position: sticky; top: 0`. Rows separated by 1px
 `--line`; last row has none. Hover: `--hover`. This is the primary component of the entire
-application — everything else exists to support it.
+application — everything else exists to support it. Inside a `panel` it drops its own border and
+fill. Column widths follow § Column rhythm.
+
+**`date-cell`** — `td.date`: tabular, left-aligned, rendered through `shortDate` in
+`src/lib/dates.ts` as `08 Aug`, or `08 Aug 25` on a row outside the year the screen is scoped to. A
+date is the row's label, not one of its figures, so it is not right-aligned like money — and a
+column of `2026-08-`-prefixed strings gives the eye no purchase for finding a row.
 
 **`money-cell`** — `--t-num`, tabular, right-aligned, `white-space: nowrap`. Sign convention: outflows
 render bare (`₹1,250.50`), inflows render with an explicit `+` in `--gain`. Zero renders as `—` in
@@ -568,7 +636,10 @@ an `<h2>` here would sit above the page's real `<h2>` and invert the outline. Th
 `role="group"` with an `aria-label` instead, which is what actually names it for a screen reader.
 
 **`filter-bar`** — A `GET` form of selects, `--space-2` gaps, wrapping. Auto-submits on change with a
-`<noscript>` submit button as the fallback. No "Apply" button when JS is on.
+`<noscript>` submit button as the fallback. No "Apply" button when JS is on. It is the `actions`
+cluster of the `page-head`, not a row of its own beneath the heading — a control that chooses what
+the screen shows belongs in the same corner as every other such control, and a separate toolbar row
+spent 28px of vertical space to say so twice.
 
 **`sparkline`** — Inline 60×16 SVG, 1.5px `--brand` stroke, no axes, no fill. Trend only. Never
 carries a tooltip; if a number matters enough to inspect, it belongs in a table.

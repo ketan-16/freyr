@@ -50,20 +50,23 @@
 
 <div class="page-head">
 	<h1>Monthly budget</h1>
-</div>
-
-<div class="toolbar">
-	<!-- The keys are pressed on the focused arrow link, which is interactive; the
-	     group only listens as they bubble, so there is nothing here to focus. -->
-	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-	<div class="stepper" role="group" aria-label="Month" {onkeydown}>
-		<a href={prevHref} aria-label="Previous month, {monthLabel(prev.year, prev.month)}">
-			<Icon name="left" />
-		</a>
-		<span class="current">{monthLabel(s.year, s.month)}</span>
-		<a href={nextHref} aria-label="Next month, {monthLabel(next.year, next.month)}">
-			<Icon name="right" />
-		</a>
+	<!--
+	  The stepper is this screen's control, so it takes the head's action slot —
+	  the corner every screen keeps its controls in.
+	-->
+	<div class="actions">
+		<!-- The keys are pressed on the focused arrow link, which is interactive; the
+		     group only listens as they bubble, so there is nothing here to focus. -->
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<div class="stepper" role="group" aria-label="Month" {onkeydown}>
+			<a href={prevHref} aria-label="Previous month, {monthLabel(prev.year, prev.month)}">
+				<Icon name="left" />
+			</a>
+			<span class="current">{monthLabel(s.year, s.month)}</span>
+			<a href={nextHref} aria-label="Next month, {monthLabel(next.year, next.month)}">
+				<Icon name="right" />
+			</a>
+		</div>
 	</div>
 </div>
 
@@ -110,56 +113,62 @@
 	</p>
 {/if}
 
-<h2>By bucket</h2>
-<div class="table-wrap">
-	<table>
-		<thead>
-			<tr>
-				<th scope="col">Bucket</th>
-				<th scope="col">Used</th>
-				<th scope="col" class="num">Share</th>
-				<th scope="col" class="num">Allocated</th>
-				<th scope="col" class="num">Actual</th>
-				<th scope="col" class="num">Remaining</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each s.rows as row (row.bucket)}
-				{@const m = meter(row.actual, row.allocated)}
+<!--
+  Six columns of figures and nothing that wants more room, so the table takes
+  its own width and the rest of the screen is gutter.
+-->
+<section class="panel tight">
+	<div class="panel-head"><h2>By bucket</h2></div>
+	<div class="table-wrap">
+		<table>
+			<thead>
 				<tr>
-					<td data-label="Bucket">{row.label}</td>
-					<td data-label="Used">
-						<span class="meter-cell">
-							<Meter value={m} />
-							<span class="pct">{m ? `${m.pct}%` : ''}</span>
-						</span>
-					</td>
-					<td data-label="Share" class="num muted">{row.bp == null ? '—' : formatBP(row.bp)}</td>
-					<td data-label="Allocated" class="num amount">
-						<Money value={row.allocated ?? 0} />
-					</td>
-					<td data-label="Actual" class="num amount"><Money value={row.actual} /></td>
-					<!--
+					<th scope="col" class="grow">Bucket</th>
+					<th scope="col">Used</th>
+					<th scope="col" class="num">Share</th>
+					<th scope="col" class="num">Allocated</th>
+					<th scope="col" class="num">Actual</th>
+					<th scope="col" class="num">Remaining</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each s.rows as row (row.bucket)}
+					{@const m = meter(row.actual, row.allocated)}
+					<tr>
+						<td data-label="Bucket" class="grow">{row.label}</td>
+						<td data-label="Used">
+							<span class="meter-cell">
+								<Meter value={m} />
+								<span class="pct">{m ? `${m.pct}%` : ''}</span>
+							</span>
+						</td>
+						<td data-label="Share" class="num muted">{row.bp == null ? '—' : formatBP(row.bp)}</td>
+						<td data-label="Allocated" class="num amount">
+							<Money value={row.allocated ?? 0} />
+						</td>
+						<td data-label="Actual" class="num amount"><Money value={row.actual} /></td>
+						<!--
 					  Before income lands there is no allocation to have anything left
 					  of, so remaining is not "0 − actual" overspend — it is nothing
 					  yet, exactly as home renders it.
 					-->
-					<td
-						data-label="Remaining"
-						class="num amount {data.awaitingIncome || row.remaining == null
-							? ''
-							: row.remaining < 0
-								? 'neg'
-								: ''}"
-					>
-						{#if data.awaitingIncome}
-							<span class="faint">—</span>
-						{:else}
-							<Money value={row.remaining ?? 0} />
-						{/if}
-					</td>
-				</tr>
-			{/each}
-		</tbody>
-	</table>
-</div>
+						<td
+							data-label="Remaining"
+							class="num amount {data.awaitingIncome || row.remaining == null
+								? ''
+								: row.remaining < 0
+									? 'neg'
+									: ''}"
+						>
+							{#if data.awaitingIncome}
+								<span class="faint">—</span>
+							{:else}
+								<Money value={row.remaining ?? 0} />
+							{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+</section>

@@ -1,5 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { monthStart, daysInMonth, dayBoundIn } from './dates';
+import { monthStart, daysInMonth, dayBoundIn, shortDate } from './dates';
+
+describe('shortDate', () => {
+	it('drops the year inside the year the screen is scoped to', () => {
+		expect(shortDate('2026-08-08', 2026)).toBe('08 Aug');
+		expect(shortDate('2026-01-01', 2026)).toBe('01 Jan');
+	});
+
+	it('keeps a two-digit year for a date outside that year', () => {
+		expect(shortDate('2025-12-31', 2026)).toBe('31 Dec 25');
+	});
+
+	it('prints the year when the screen names no context', () => {
+		expect(shortDate('2026-08-08')).toBe('08 Aug 26');
+	});
+
+	// Slicing, not Date parsing: a Date would shift the day in any timezone
+	// behind UTC and print the 7th.
+	it('does not shift the day across a timezone', () => {
+		expect(shortDate('2026-08-01', 2026)).toBe('01 Aug');
+	});
+
+	it('returns anything that is not an ISO date unchanged', () => {
+		expect(shortDate('', 2026)).toBe('');
+		expect(shortDate('not a date', 2026)).toBe('not a date');
+	});
+});
 
 describe('monthStart', () => {
 	it('snaps a mid-month date to the first of that month', () => {

@@ -27,6 +27,28 @@ export function monthLabel(year: number, month: number): string {
 	return `${MONTH_NAMES[month - 1]} ${year}`;
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A date for a dense table column: `08 Aug`. An ISO string is unambiguous but
+ * spends eleven characters, eight of which a month-scoped table already told
+ * the reader in its heading — and it right-aligns as a wall of identical
+ * prefixes that the eye cannot use to find a row.
+ *
+ * `contextYear` is the year the surrounding screen is already scoped to. The
+ * year is printed whenever the date falls outside it, so a Recent list that
+ * crosses New Year stays truthful; pass nothing and it is always printed.
+ * Sliced rather than parsed into a `Date` — dates are plain strings app-wide
+ * and constructing one here would reintroduce the timezone shift the rest of
+ * this module exists to avoid.
+ */
+export function shortDate(date: string, contextYear?: number): string {
+	if (!DATE_RE.test(date)) return date;
+	const year = Number(date.slice(0, 4));
+	const label = `${date.slice(8, 10)} ${MONTH_NAMES[Number(date.slice(5, 7)) - 1].slice(0, 3)}`;
+	return year === contextYear ? label : `${label} ${String(year).slice(2)}`;
+}
+
 export function prevMonth(year: number, month: number): { year: number; month: number } {
 	return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
 }

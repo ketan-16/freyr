@@ -417,31 +417,185 @@ h2 {
 
 /* ---- Page head --------------------------------------------------------- */
 
+/* One grammar on every screen: name, context, then the screen's own controls
+   pushed to the right. The rule beneath it is what makes the head read as a
+   band rather than as the first line of the content. */
 .page-head {
 	display: flex;
-	align-items: baseline;
-	gap: var(--space-3);
+	align-items: center;
+	gap: var(--space-2) var(--space-3);
 	flex-wrap: wrap;
-	margin-bottom: var(--space-3);
+	min-height: var(--control-h);
+	margin-bottom: var(--space-4);
+	padding-bottom: var(--space-2);
+	border-bottom: 1px solid var(--line);
 }
 
 .page-head h1 {
 	margin: 0;
 }
 
+/* Where the head names the period or the scope the screen is showing. */
+.page-head .context {
+	font-size: var(--t-body);
+	color: var(--ink-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+/* Controls belong to the screen, not to the heading — they go to the far end,
+   in the same place on every page, so the eye learns one location. */
+.page-head .actions {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	flex-wrap: wrap;
+	margin-left: auto;
+}
+
+/* Explanatory prose — the paragraph a screen needs to define a column before
+   the reader meets the figures. Capped at a readable measure: these ran the
+   full width of the page, which is 180 characters on a wide screen. */
+.prose {
+	max-width: 68ch;
+	margin: 0 0 var(--space-3);
+	font-size: var(--t-body);
+	color: var(--ink-muted);
+}
+
+/* ---- Panels ------------------------------------------------------------ */
+
+/* Sections are laid out on a grid that fits as many panels per row as will
+   hold their content, so a five-column table on a 1440px screen is 590px wide
+   rather than 1200px and its figures stay beside the rows they belong to.
+   auto-fit rather than a breakpoint: the wrap point follows the actual width,
+   including the reader's zoom level. */
+.panels {
+	display: grid;
+	/* 36rem is measured, not chosen: a bucket table is a name, an 11rem meter
+	   and three money columns, and it needs every pixel of it. Below that the
+	   grid must stay one column — a track narrower than the table it holds
+	   clips the last figure rather than making the table shrink, because the
+	   cells are nowrap by design.
+
+	   min(…, 100%) rather than the bare floor: an auto-fit track keeps its
+	   minimum even when the container is narrower than it, which overflows a
+	   phone by the difference. */
+	grid-template-columns: repeat(auto-fit, minmax(min(var(--panel-min, 36rem), 100%), 1fr));
+	gap: var(--space-4);
+	align-items: start;
+}
+
+/* Anything that needs the whole measure — a seven-column table, or the entry
+   bar, which is a toolbar for the table directly beneath it and has to span
+   the same width. */
+.panels > .wide {
+	grid-column: 1 / -1;
+}
+
+/* The grid owns the spacing between its children. */
+.panels .entry-wrap {
+	margin-bottom: 0;
+}
+
+.panel {
+	min-width: 0;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: var(--r-2);
+}
+
+/* A panel whose table has no column that wants more than its content — all
+   figures, no note — takes only the width it needs, and the remainder of the
+   screen becomes gutter. This is DESIGN.md § Grid's rule applied at the panel
+   rather than at the shell: the alternative is a lone table stretched to
+   1200px with 500px of air inside one column, which is the same defect the
+   column rhythm exists to remove. */
+.panel.tight {
+	width: fit-content;
+	max-width: 100%;
+	justify-self: start;
+}
+
+.panel.tight > .table-wrap > table {
+	width: auto;
+}
+
+/* --surface, not --sunk: the sunk step is the table header's, and two grey
+   bands stacked would read as one heavy block with a hairline through it. */
+.panel-head {
+	display: flex;
+	align-items: baseline;
+	gap: var(--space-2) var(--space-3);
+	flex-wrap: wrap;
+	padding: var(--space-1) var(--space-3);
+	border-bottom: 1px solid var(--line);
+}
+
+.panel-head h2 {
+	margin: 0;
+}
+
+/* The panel's own figure — a count, a total, the thing the section sums to. */
+.panel-head .meta {
+	margin-left: auto;
+	font-size: var(--t-caption);
+	color: var(--ink-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.panel-head .meta a {
+	color: var(--ink-muted);
+	text-decoration: underline;
+}
+
+/* Inside a panel the table has already been given a border and a fill by its
+   container, so it sheds its own rather than drawing a second box 1px inside
+   the first. */
+.panel > .table-wrap {
+	background: none;
+	border: 0;
+	border-radius: 0;
+}
+
+.panel > .table-wrap > table {
+	border-radius: 0 0 var(--r-2) var(--r-2);
+}
+
+/* A panel holding prose rather than a table still needs its padding. */
+.panel-body {
+	padding: var(--space-3);
+}
+
+.panel-body > :last-child {
+	margin-bottom: 0;
+}
+
+/* A form inside a panel has been given its box by the panel already, so it
+   sheds its own — the same rule the table follows one block up. The phone
+   layout hands it back, because there the panel has no box to inherit. */
+.panel > .entry-wrap {
+	margin-bottom: 0;
+}
+
+.panel > .entry-wrap > .entry {
+	border: 0;
+	border-radius: 0;
+}
+
 /* ---- KPI --------------------------------------------------------------- */
 
+/* Equal tracks, capped: a grid so the tiles share one width and their figures
+   line up down a column, and capped at 14rem so three tiles on a wide screen
+   stay a strip rather than stretching into three quarter-page banners. */
 .kpis {
-	display: flex;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(11rem, 14rem));
 	gap: var(--space-3);
-	flex-wrap: wrap;
+	margin-bottom: var(--space-4);
 }
 
 .kpi {
-	/* Sized to content, not stretched — a tile wide enough for four figures
-	   spends screen the table wants. */
-	flex: 0 0 auto;
-	min-width: 11rem;
+	min-width: 0;
 	padding: var(--space-3);
 	background: var(--surface);
 	border: 1px solid var(--line);
@@ -557,6 +711,23 @@ td {
 	line-height: 20px;
 	text-align: left;
 	border-bottom: 1px solid var(--line);
+	/* Column rhythm. A 100%-wide auto-layout table hands its slack to whichever
+	   column will take it — which is how a right-aligned date ended up floating
+	   350px from the left edge of its own row with a void beside it. Every
+	   column is asked for its content's width instead; the one column marked
+	   .grow absorbs what is left, so figures sit next to the rows they describe
+	   however wide the screen gets. Overridden in the phone reflow, where cells
+	   are no longer laid out as columns at all. */
+	width: 1%;
+	white-space: nowrap;
+}
+
+/* The column that takes the slack — a note, or the row's name. The only one
+   allowed to wrap, so a long note grows the row rather than the table. */
+th.grow,
+td.grow {
+	width: auto;
+	white-space: normal;
 }
 
 th {
@@ -593,14 +764,23 @@ th.num {
 	white-space: nowrap;
 }
 
+/* A date column. Tabular, so the digits stack; left-aligned, because a date
+   is the row's label and not one of its figures — right-aligning it was what
+   pushed it away from the row's own left edge. */
+td.date,
+th.date {
+	font-variant-numeric: tabular-nums;
+}
+
 td.amount {
 	min-width: 6.5rem;
 }
 
-/* Keep the meter column from absorbing the table's spare width. Not a child
-   combinator: the meter shares a .meter-cell with its percentage figure. */
+/* The track plus its percentage, given a fixed column so the bars in a table
+   share one baseline length and can be compared against each other. Not a
+   child combinator: the meter shares a .meter-cell with its percentage. */
 td:has(.meter) {
-	width: 8rem;
+	width: 11rem;
 }
 
 /* A block-level form inside a cell generates its own line box and adds
@@ -780,14 +960,6 @@ button.icon {
 .field {
 	display: flex;
 	flex-direction: column;
-}
-
-.toolbar {
-	display: flex;
-	gap: var(--space-2);
-	align-items: center;
-	flex-wrap: wrap;
-	margin-bottom: var(--space-3);
 }
 
 .entry {
@@ -1084,15 +1256,20 @@ button.icon {
 		border-radius: var(--r-2);
 	}
 
+	/* Cells are cards' lines here, not columns: the 1% width and the nowrap that
+	   give a table its column rhythm would collapse every line and clip every
+	   note. */
 	tbody td {
 		display: flex;
 		justify-content: space-between;
 		gap: var(--space-3);
+		width: auto;
 		height: auto;
 		min-height: 22px;
 		padding: 1px 0;
 		border: 0;
 		text-align: left;
+		white-space: normal;
 	}
 
 	tbody td::before {
@@ -1221,7 +1398,40 @@ button.icon {
 		height: 44px;
 	}
 
-	.kpi {
-		flex: 1 1 100%;
+	/* One tile per row: a phone has no width to share and a half-width tile
+	   would wrap its own figure. */
+	.kpis {
+		grid-template-columns: 1fr;
+	}
+
+	/* Panels are the cards' container on a phone; the rows inside them already
+	   carry their own border, so the panel would draw a box around a stack of
+	   boxes. The head stays — it is the only thing naming the section. */
+	.panel {
+		background: none;
+		border: 0;
+	}
+
+	.panel-head {
+		padding: 0 0 var(--space-1);
+	}
+
+	.panel > .table-wrap {
+		padding: 0;
+	}
+
+	/* The panel has no box here to have taken the form's place, so the form
+	   keeps its own — and its rounded foot under the open disclosure. */
+	.panel > .entry-wrap > .entry {
+		border: 1px solid var(--line);
+		border-radius: var(--r-2);
+	}
+
+	.panel > .entry-wrap[open] > .entry {
+		border-radius: 0 0 var(--r-2) var(--r-2);
+	}
+
+	.page-head {
+		margin-bottom: var(--space-3);
 	}
 }

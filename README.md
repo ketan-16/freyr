@@ -19,9 +19,10 @@ rationale and [ARCHITECTURE.md](ARCHITECTURE.md) for how it's put together.
 
 - **Home** — the command centre, not a summary page. One hero figure (what's left this month,
   or spend-so-far when there is nothing yet to be left of) with a delta against the same span
-  of days last month; the three buckets as meters that rescale to show an overspend rather
-  than clip at 100%; the same add form the ledger uses, inline, so a transaction lands
-  without leaving the page; then recent activity and goal progress.
+  of days last month; tiles for income, spent and lendings outstanding; the three buckets as
+  meters that rescale to show an overspend rather than clip at 100%, beside goal progress;
+  then the same add form the ledger uses, inline above recent activity, so a transaction
+  lands without leaving the page.
 - **Ledger** — every transaction for a month, filterable by month/year/bucket, with the same
   add form above the table it feeds.
 - **Monthly** — allocated vs actual vs remaining per bucket, with month-over-month deltas.
@@ -37,11 +38,15 @@ rationale and [ARCHITECTURE.md](ARCHITECTURE.md) for how it's put together.
 ## Interface
 
 Dense and keyboard-first: 29px table rows, 28px controls, tabular figures, and a month of
-transactions on one screen. Light and dark themes are both first-class — the theme is a
-cookie resolved during SSR, so there's no flash on load and the toggle works with JavaScript
-off. Responsive down to a phone, where the rail becomes a bottom tab bar and tables reflow to
-cards. Every colour pair is contrast-verified (text ≥ 4.5:1, UI boundaries ≥ 3:1) in both
-themes.
+transactions on one screen. Every screen opens the same way — name, the period it is showing,
+then its controls in the same right-hand corner — and every section is a panel with a heading
+of its own. Table columns take their content's width, with one column per table absorbing the
+slack, so a figure stays beside the row it belongs to instead of drifting to the far edge of a
+wide display; where two tables fit side by side, they sit side by side. Light and dark themes
+are both first-class — the theme is a cookie resolved during SSR, so there's no flash on load
+and the toggle works with JavaScript off. Responsive down to a phone, where the rail becomes a
+bottom tab bar and tables reflow to cards. Every colour pair is contrast-verified (text ≥
+4.5:1, UI boundaries ≥ 3:1) in both themes.
 
 The full spec — palette, type scale, components, responsive rules, and the logo — is
 [DESIGN.md](DESIGN.md).
