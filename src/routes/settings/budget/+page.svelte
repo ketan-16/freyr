@@ -193,7 +193,7 @@
 						<th scope="col" class="num">Needs</th>
 						<th scope="col" class="num">Wants</th>
 						<th scope="col" class="num">Invest</th>
-						<th scope="col" class="grow">Note</th>
+						<th scope="col" class="wrap">Note</th>
 						<th scope="col"><span class="visually-hidden">Actions</span></th>
 					</tr>
 				</thead>
@@ -210,7 +210,7 @@
 							<td data-label="Needs" class="num">{formatBP(promotion.weights.needsBP)}</td>
 							<td data-label="Wants" class="num">{formatBP(promotion.weights.wantsBP)}</td>
 							<td data-label="Invest" class="num">{formatBP(promotion.weights.investBP)}</td>
-							<td data-label={promotion.note ? 'Note' : null} class="muted grow">
+							<td data-label={promotion.note ? 'Note' : null} class="muted wrap">
 								{promotion.note ?? ''}
 							</td>
 							<td data-label="">
@@ -234,7 +234,12 @@
 		</div>
 	</section>
 
-	<section class="panel">
+	<!--
+	  Full width, and last: it is the tallest panel of the three, and left in a
+	  half-track it pushed the grid into a second row whose other column stood
+	  empty for 459px.
+	-->
+	<section class="panel wide">
 		<div class="panel-head"><h2>Periods</h2></div>
 		<div class="panel-body">
 			<p class="prose">
@@ -303,7 +308,7 @@
 			<table>
 				<thead>
 					<tr>
-						<th scope="col" class="date grow">Effective from</th>
+						<th scope="col" class="date">Effective from</th>
 						<th scope="col" class="num">Needs</th>
 						<th scope="col" class="num">Wants</th>
 						<th scope="col" class="num">Invest</th>
@@ -315,9 +320,7 @@
 					{#each data.periods as period (period.id)}
 						<tr>
 							<!-- Periods run from the base year onward, so each row carries its own. -->
-							<td data-label="Effective from" class="date grow"
-								>{shortDate(period.effectiveFrom)}</td
-							>
+							<td data-label="Effective from" class="date">{shortDate(period.effectiveFrom)}</td>
 							<td data-label="Needs" class="num">{formatBP(period.needsBP)}</td>
 							<td data-label="Wants" class="num">{formatBP(period.wantsBP)}</td>
 							<td data-label="Invest" class="num">{formatBP(period.investBP)}</td>

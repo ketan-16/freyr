@@ -130,7 +130,8 @@
 			<table>
 				<thead>
 					<tr>
-						<th scope="col" class="grow">Bucket</th>
+						<!-- No `.grow`: five columns of figures, sharing the leftover width. -->
+						<th scope="col">Bucket</th>
 						<th scope="col">Used</th>
 						<th scope="col" class="num">Allocated</th>
 						<th scope="col" class="num">Actual</th>
@@ -141,7 +142,7 @@
 					{#each s.rows as row (row.bucket)}
 						{@const m = meter(row.actual, row.allocated)}
 						<tr>
-							<td data-label="Bucket" class="grow">{row.label}</td>
+							<td data-label="Bucket">{row.label}</td>
 							<td data-label="Used">
 								<span class="meter-cell">
 									<Meter value={m} />
@@ -185,7 +186,7 @@
 			<table>
 				<thead>
 					<tr>
-						<th scope="col" class="grow">Goal</th>
+						<th scope="col">Goal</th>
 						<th scope="col">Progress</th>
 						<th scope="col" class="num">Saved</th>
 						<th scope="col" class="num">Target</th>
@@ -196,7 +197,7 @@
 					{#each data.goals as g (g.goal.id)}
 						{@const m = meter(g.contributed, g.goal.targetPaise)}
 						<tr>
-							<td data-label="Goal" class="grow">
+							<td data-label="Goal">
 								{g.goal.name}
 								{#if g.goal.kind === 'pot'}<span class="tag">pot</span>{/if}
 							</td>
@@ -238,7 +239,7 @@
 						<th scope="col" class="num">Amount</th>
 						<th scope="col">Type</th>
 						<th scope="col">Category</th>
-						<th scope="col" class="grow">Note</th>
+						<th scope="col" class="wrap">Note</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -260,7 +261,7 @@
 								{/if}
 							</td>
 							<td data-label={t.categoryName ? 'Category' : null}>{t.categoryName ?? ''}</td>
-							<td data-label={t.note ? 'Note' : null} class="muted grow">{t.note ?? ''}</td>
+							<td data-label={t.note ? 'Note' : null} class="muted wrap">{t.note ?? ''}</td>
 						</tr>
 					{:else}
 						<tr><td class="empty" colspan="5">Nothing recorded yet.</td></tr>

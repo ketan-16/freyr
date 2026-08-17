@@ -370,8 +370,10 @@ difference between a 29px row and a 37px one, which is four extra transactions o
 - **Main max width:** `100rem` (1600px). Beyond that, tables get gutters rather than stretching; a
   2400px-wide transaction row is unreadable.
 - **Sections:** a `panels` grid, `repeat(auto-fit, minmax(min(--panel-min, 100%), 1fr))` with
-  `--panel-min` at `36rem`. Screens wide enough for two tables get two; narrower ones get one. The
-  wrap point follows the container, so it holds at any zoom level without a breakpoint.
+  `--panel-min` at `36rem` and `align-items: stretch`. Screens wide enough for two tables get two;
+  narrower ones get one. The wrap point follows the container, so it holds at any zoom level without
+  a breakpoint. Panels in a row share a height — a card with room at the bottom reads as a card,
+  where a short card floating above a gap reads as a layout fault.
 - **Forms:** capped at `36rem` when standalone (auth). The ledger entry bar is full-width by design —
   it is a toolbar, not a form.
 - **Tables:** `width: 100%`, `table-layout: auto`. The amount column gets a `min-width` so it never
@@ -379,27 +381,44 @@ difference between a 29px row and a 37px one, which is four extra transactions o
 
 #### Column rhythm
 
-Every cell is `width: 1%` and `white-space: nowrap`; exactly one column per table carries `.grow`,
-which is `width: auto` and the only column allowed to wrap.
+Every cell is `width: 1%` and `white-space: nowrap`. **No column is given `width: auto`.** The
+browser therefore sizes each column to its content and shares whatever is left between them in
+proportion, so a column with longer content gets a larger share and no column gets all of it.
 
-This exists because a 100%-wide auto-layout table hands its slack to whichever column will take it.
-On a 1440px screen that put a bucket's name at x=225 and its Remaining at x=1400 — a row you have to
-read across the whole display — and right-aligned a `2026-08-08` some 350px from its own row's left
-edge with a void beside it. Asking every column for its content's width and nominating one absorber
-keeps a figure beside the row it describes at any width.
+This exists because a 100%-wide auto-layout table otherwise hands its slack to whichever column will
+take it. On a 1440px screen that put a bucket's name at x=225 and its Remaining at x=1400 — a row
+you have to read across the whole display — and right-aligned a `2026-08-08` some 350px from its own
+row's left edge with a void beside it.
 
-The nominated column is the one that genuinely wants room: a note, or the row's name. A table of
-pure figures nominates none and takes `.tight` instead.
+> **Superseded: one nominated `.grow` column.** The first fix gave the slack to a single named
+> column. That only moved the hole: on the ledger it made a 794px Note column beside three-word
+> notes, and on a monthly bucket table it handed 580px to whichever column was nominated — the
+> meter hit its cap and the remainder became dead space inside that one cell. Sharing the slack
+> between all columns has no such failure case.
 
-- **`.tight`** — `width: fit-content` on the panel and `width: auto` on its table. For a table whose
-  columns all want their content and nothing more (monthly's six-column bucket table). The panel
-  takes what it needs and the rest of the screen becomes gutter, which is this section's rule applied
-  at the panel instead of at the shell.
-- **`.wide`** — `grid-column: 1 / -1`. For a table that earns the whole measure (the ledger's seven
-  columns with real notes) and for the entry bar, which must span the table it writes to.
+- **`.wrap`** — `white-space: normal`, and nothing else. Marks a free-text column (a note) as
+  allowed to wrap, so a long value grows the row rather than forcing the table wider. It does **not**
+  claim width; that was the mistake above.
+- **`.wide`** — `grid-column: 1 / -1` on a panel grid child. For the table that earns the whole
+  measure and for the entry bar, which must span the table it writes to. Give it to the tallest
+  panel on a page: a tall panel left in a half-track sets a row height its neighbour cannot fill.
 
 The phone reflow overrides both the `1%` and the nowrap: below `40rem` cells are a card's lines, not
 columns, and the column rhythm would collapse every line and clip every note.
+
+#### One measure per page
+
+**Every top-level block on a page spans the full content width** — page head, hero, KPI strip, and
+the panel grid all start at 0 and end at the same right edge. Inside the grid a panel occupies one
+track or, with `.wide`, all of them. There is no third width.
+
+This is a rule because breaking it is invisible while you are writing one component and glaring when
+the page is assembled. Three separate violations shipped at once: a KPI strip whose tiles were
+capped at `14rem` ended 504px short of the panels below it and sat on a 12px gutter against their
+16px; a panel that sized itself to its table left a 641px card under a 1200px strip; and panels in a
+grid row that did not share a height left a short card floating above a gap. Measure the left and
+right edge of every block before calling a screen done — the defect reads as "randomly misaligned"
+and is never obvious from the markup.
 
 ### Whitespace philosophy
 
@@ -486,7 +505,7 @@ _markup_ repeats across pages (those names are real paths under `src/lib/compone
 | `tabbar-mobile`      | `.tabbar`                                                                                |
 | `theme-toggle`       | no class of its own — `ThemeToggle.svelte`; `.rail-btn` in the rail, bare above it       |
 | `page-head`          | `.page-head`, with `.context` and the `.actions` cluster                                 |
-| `panel-grid`         | `.panels`, with the `.wide` and `.tight` modifiers on its children                       |
+| `panel-grid`         | `.panels`, with the `.wide` modifier on its children                                     |
 | `panel`              | `.panel`, head in `.panel-head` (+ `.meta`), prose in `.panel-body`                      |
 | `prose`              | `.prose`                                                                                 |
 | `kpi-strip`          | `.kpis`                                                                                  |
@@ -611,10 +630,13 @@ is about 180 characters and unreadable as prose.
 
 ### Data display
 
-**`kpi-strip`** — `display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 14rem))`.
-The row of summary tiles at the top of a screen. Equal tracks so the figures line up down a column,
-capped at `14rem` so three tiles on a wide screen stay a strip rather than stretching into three
-quarter-page banners. One per row below `40rem`.
+**`kpi-strip`** — `display: grid; grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr))`,
+`gap: --space-4`. The row of summary tiles at the top of a screen. Equal tracks, spanning the full
+measure, on the same gutter as the panel grid. One per row below `40rem`.
+
+The tiles were once capped at `14rem` to stop them "stretching into quarter-page banners". That cap
+ended the strip 504px short of every other block on the page and put it on a different gutter, which
+is a far louder defect than a tile with room to spare. See § One measure per page.
 
 **`kpi-tile`** — `--surface`, 1px `--line`, `--r-2`, `--shadow-card`, `--space-4` padding. Two lines
 only: `--t-label` in `--ink-muted` sentence case, then `--t-figure` tabular in `--ink`. An optional

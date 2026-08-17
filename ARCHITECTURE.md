@@ -182,13 +182,20 @@ from a raw dump of the real workbook:
   properties; the dark theme re-declares them under `[data-theme='dark']` and again inside a
   `prefers-color-scheme` block for the no-cookie case. The duplication is deliberate — the
   alternative is a class-swap that flashes or a build step the stack rules out.
-- **Table columns are content-sized, with one nominated absorber per table.** Cells are
-  `width: 1%` and nowrap; the one column carrying `.grow` takes the slack and is the only one
-  allowed to wrap. A 100%-wide auto-layout table otherwise hands its slack to whichever column
-  will take it, which on a wide screen put a row's name and its figures a full display apart.
-  A table of pure figures nominates no absorber and its panel takes `.tight` instead, becoming
-  content-width so the leftover is gutter. The phone reflow overrides both rules, because
-  there the cells are a card's lines rather than columns.
+- **Table columns are content-sized and share the leftover width.** Every cell is `width: 1%`
+  and nowrap and nothing is `width: auto`, so the browser sizes each column to its content and
+  splits the remainder between them in proportion. A 100%-wide auto-layout table otherwise
+  hands its slack to whichever column will take it, which on a wide screen put a row's name and
+  its figures a full display apart. Nominating a single absorber column was tried first and
+  merely relocated the hole. `.wrap` marks a free-text column as allowed to wrap without
+  claiming width. The phone reflow overrides both rules, because there the cells are a card's
+  lines rather than columns.
+- **Every top-level block on a page spans the full content width.** Page head, hero, KPI strip
+  and the panel grid share one left and right edge; a panel takes one grid track or, with
+  `.wide`, all of them. Three violations shipped together and read to the user as "randomly
+  misaligned": a KPI strip capped narrower than the panels below it, a panel sized to its own
+  table, and grid rows whose panels did not share a height. The check is mechanical — measure
+  every block's left and right edge — and is worth running after any layout change.
 - **Sections are laid out by a CSS grid, not by breakpoints.** `.panels` is
   `repeat(auto-fit, minmax(min(36rem, 100%), 1fr))`, so two tables sit side by side exactly
   when two will fit and stack otherwise — at any window size and any zoom level, with no media

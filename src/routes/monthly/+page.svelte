@@ -113,17 +113,15 @@
 	</p>
 {/if}
 
-<!--
-  Six columns of figures and nothing that wants more room, so the table takes
-  its own width and the rest of the screen is gutter.
--->
-<section class="panel tight">
+<section class="panel">
 	<div class="panel-head"><h2>By bucket</h2></div>
 	<div class="table-wrap">
 		<table>
 			<thead>
 				<tr>
-					<th scope="col" class="grow">Bucket</th>
+					<!-- No `.grow` in this table: six columns of figures, none of which
+					     deserves the leftover width, so they share it. -->
+					<th scope="col">Bucket</th>
 					<th scope="col">Used</th>
 					<th scope="col" class="num">Share</th>
 					<th scope="col" class="num">Allocated</th>
@@ -135,7 +133,7 @@
 				{#each s.rows as row (row.bucket)}
 					{@const m = meter(row.actual, row.allocated)}
 					<tr>
-						<td data-label="Bucket" class="grow">{row.label}</td>
+						<td data-label="Bucket">{row.label}</td>
 						<td data-label="Used">
 							<span class="meter-cell">
 								<Meter value={m} />

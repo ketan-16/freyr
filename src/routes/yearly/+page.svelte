@@ -122,7 +122,7 @@
 			<table>
 				<thead>
 					<tr>
-						<th scope="col" class="grow">Bucket</th>
+						<th scope="col">Bucket</th>
 						<th scope="col" class="num">Allocated</th>
 						<th scope="col" class="num">Actual</th>
 						<th scope="col" class="num">Remaining</th>
@@ -132,7 +132,7 @@
 				<tbody>
 					{#each data.allocation.rows as row (row.bucket)}
 						<tr>
-							<td data-label="Bucket" class="grow">{row.label}</td>
+							<td data-label="Bucket">{row.label}</td>
 							<td data-label="Allocated" class="num amount">
 								<Money value={row.allocated ?? 0} />
 							</td>
@@ -171,12 +171,45 @@
 	</section>
 
 	<section class="panel">
+		<div class="panel-head"><h2>Income split</h2></div>
+		<div class="table-wrap">
+			<table>
+				<thead>
+					<tr>
+						<th scope="col">Source</th>
+						<th scope="col" class="num">Amount</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td data-label="Source">Job</td>
+						<td data-label="Amount" class="num amount">
+							<Money value={data.summary.job} direction="income" />
+						</td>
+					</tr>
+					<tr>
+						<td data-label="Source">Side hustle</td>
+						<td data-label="Amount" class="num amount">
+							<Money value={data.summary.sideHustle} direction="income" />
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</section>
+
+	<!--
+	  Twelve rows and five columns — the tallest table on the page, and last, so
+	  it takes the full width rather than setting a row height that leaves the
+	  panel beside it floating above a gap. No `.grow`: the columns share.
+	-->
+	<section class="panel wide">
 		<div class="panel-head"><h2>By month</h2></div>
 		<div class="table-wrap">
 			<table>
 				<thead>
 					<tr>
-						<th scope="col" class="grow">Month</th>
+						<th scope="col">Month</th>
 						<th scope="col" class="num">Income</th>
 						<th scope="col" class="num">Needs</th>
 						<th scope="col" class="num">Wants</th>
@@ -186,7 +219,7 @@
 				<tbody>
 					{#each data.months as m (m.month)}
 						<tr>
-							<td data-label="Month" class="grow">
+							<td data-label="Month">
 								<a href="/monthly?year={data.year}&month={m.month}">{MONTH_NAMES[m.month - 1]}</a>
 							</td>
 							<td data-label="Income" class="num amount">
@@ -199,34 +232,6 @@
 					{:else}
 						<tr><td class="empty" colspan="5">No transactions in {data.year}.</td></tr>
 					{/each}
-				</tbody>
-			</table>
-		</div>
-	</section>
-
-	<section class="panel">
-		<div class="panel-head"><h2>Income split</h2></div>
-		<div class="table-wrap">
-			<table>
-				<thead>
-					<tr>
-						<th scope="col" class="grow">Source</th>
-						<th scope="col" class="num">Amount</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr>
-						<td data-label="Source" class="grow">Job</td>
-						<td data-label="Amount" class="num amount">
-							<Money value={data.summary.job} direction="income" />
-						</td>
-					</tr>
-					<tr>
-						<td data-label="Source" class="grow">Side hustle</td>
-						<td data-label="Amount" class="num amount">
-							<Money value={data.summary.sideHustle} direction="income" />
-						</td>
-					</tr>
 				</tbody>
 			</table>
 		</div>

@@ -492,7 +492,11 @@ h2 {
 	   phone by the difference. */
 	grid-template-columns: repeat(auto-fit, minmax(min(var(--panel-min, 36rem), 100%), 1fr));
 	gap: var(--space-4);
-	align-items: start;
+	/* Panels in a row share a height (the grid default) rather than each taking
+	   its own. `align-items: start` left the shorter card floating with a gap
+	   beneath it and the next row starting below the taller one — which reads as
+	   a hole in the layout. A card with room at the bottom reads as a card. */
+	align-items: stretch;
 }
 
 /* Anything that needs the whole measure — a seven-column table, or the entry
@@ -515,21 +519,11 @@ h2 {
 	box-shadow: var(--shadow-card);
 }
 
-/* A panel whose table has no column that wants more than its content — all
-   figures, no note — takes only the width it needs, and the remainder of the
-   screen becomes gutter. This is DESIGN.md § Grid's rule applied at the panel
-   rather than at the shell: the alternative is a lone table stretched to
-   1200px with 500px of air inside one column, which is the same defect the
-   column rhythm exists to remove. */
-.panel.tight {
-	width: fit-content;
-	max-width: 100%;
-	justify-self: start;
-}
-
-.panel.tight > .table-wrap > table {
-	width: auto;
-}
+/* No `.tight` panel. A panel that sized itself to its table left a 641px box
+   under a 1200px KPI strip with 559px of bare canvas beside it — it solved a
+   spreading table by breaking the page's alignment instead, which is the worse
+   of the two. Panels always fill their track, and the table inside shares its
+   leftover width between every column rather than pooling it in one. */
 
 /* --surface, not --sunk: the sunk step is the table header's, and two grey
    bands stacked would read as one heavy block with a hairline through it. */
@@ -595,13 +589,15 @@ h2 {
 
 /* ---- KPI --------------------------------------------------------------- */
 
-/* Equal tracks, capped: a grid so the tiles share one width and their figures
-   line up down a column, and capped at 14rem so three tiles on a wide screen
-   stay a strip rather than stretching into three quarter-page banners. */
+/* The same grid the panels use, and the same gutter. Tiles were capped at
+   14rem, which ended the strip 504px short of every other block on the page
+   and set it on a 12px gutter while the panels below used 16px — two grids
+   stacked on one page, which is what read as "randomly misaligned". A tile
+   with room to spare is a smaller cost than a page with two right edges. */
 .kpis {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(11rem, 14rem));
-	gap: var(--space-3);
+	grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+	gap: var(--space-4);
 	margin-bottom: var(--space-4);
 }
 
@@ -686,6 +682,7 @@ h2 {
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
+	width: 100%;
 }
 
 .meter-cell .pct {
@@ -726,19 +723,23 @@ td {
 	/* Column rhythm. A 100%-wide auto-layout table hands its slack to whichever
 	   column will take it — which is how a right-aligned date ended up floating
 	   350px from the left edge of its own row with a void beside it. Every
-	   column is asked for its content's width instead; the one column marked
-	   .grow absorbs what is left, so figures sit next to the rows they describe
-	   however wide the screen gets. Overridden in the phone reflow, where cells
-	   are no longer laid out as columns at all. */
+	   column is asked for its content's width instead, and the leftover is
+	   shared between them in proportion, so figures sit next to the rows they
+	   describe however wide the screen gets. Overridden in the phone reflow,
+	   where cells are no longer laid out as columns at all. */
 	width: 1%;
 	white-space: nowrap;
 }
 
-/* The column that takes the slack — a note, or the row's name. The only one
-   allowed to wrap, so a long note grows the row rather than the table. */
-th.grow,
-td.grow {
-	width: auto;
+/* A column of free text — a note — may wrap. It does not claim the slack.
+   Nothing sets `width: auto`: a single column marked as the absorber took all
+   580px of a wide table's leftover and printed it as one hole beside short
+   notes. With every column asking only for its content, the browser shares the
+   remainder between them in proportion, so a long note still gets the largest
+   share (and wraps rather than forcing the table wider) while a short one
+   leaves no crater. */
+th.wrap,
+td.wrap {
 	white-space: normal;
 }
 
