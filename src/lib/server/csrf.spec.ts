@@ -25,11 +25,18 @@ describe('isCrossSiteWrite', () => {
 		expect(isCrossSiteWrite(req('GET', {}))).toBe(false);
 	});
 
-	it('flags a POST with a foreign or missing origin', () => {
-		expect(isCrossSiteWrite(req('POST', { host: 'localhost:3000' }))).toBe(true);
+	it('flags a POST from a foreign origin', () => {
 		expect(
 			isCrossSiteWrite(req('POST', { host: 'localhost:3000', origin: 'http://evil.example' }))
 		).toBe(true);
+	});
+
+	it('allows a POST with no or "null" Origin (same-origin form nav, e.g. Safari)', () => {
+		// Safari sends no Origin — or the literal "null" when the referrer is
+		// suppressed — on a same-origin form navigation. A cross-site attacker's
+		// request names a real foreign host, so neither is a forgery.
+		expect(isCrossSiteWrite(req('POST', { host: 'localhost:3000' }))).toBe(false);
+		expect(isCrossSiteWrite(req('POST', { host: 'localhost:3000', origin: 'null' }))).toBe(false);
 	});
 
 	it('accepts a same-host POST regardless of protocol', () => {
