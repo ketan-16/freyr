@@ -72,16 +72,18 @@ focus ≥ 3:1. Re-measure before changing any token, in both themes.
 
 ### Surfaces
 
-| Token           | Light     | Dark      | Use                                                       |
-| --------------- | --------- | --------- | --------------------------------------------------------- |
-| `--bg`          | `#F4F4F5` | `#09090B` | Sidebar, auth backdrop — the chrome one step behind       |
-| `--surface`     | `#FFFFFF` | `#111113` | The main column, panels, popovers, dialogs                |
-| `--sunk`        | `#F6F6F7` | `#18181B` | Wells: segmented track, entry bar, day headers on a phone |
-| `--hover`       | `#F2F2F4` | `#18181B` | Row and item hover                                        |
-| `--active`      | `#E9E9EC` | `#202024` | Current nav item, pressed icon button, selected menu item |
-| `--line`        | `#E7E7EA` | `#222226` | Hairlines: table rows, panel borders                      |
-| `--line-2`      | `#DCDCE0` | `#2C2C31` | Button and segmented borders, popover edges               |
-| `--line-strong` | `#84848E` | `#68686F` | **Input and select boundaries** — 3.31 / 3.20 worst case  |
+| Token           | Light     | Dark      | Use                                                                                          |
+| --------------- | --------- | --------- | -------------------------------------------------------------------------------------------- |
+| `--bg`          | `#F4F4F5` | `#09090B` | Sidebar, auth backdrop — the chrome one step behind                                          |
+| `--surface`     | `#FFFFFF` | `#111113` | The main column, panels, popovers, dialogs                                                   |
+| `--sunk`        | `#F6F6F7` | `#18181B` | Wells: segmented track, entry bar, day headers on a phone                                    |
+| `--hover`       | `#F2F2F4` | `#18181B` | Row and item hover                                                                           |
+| `--active`      | `#E9E9EC` | `#202024` | Current nav item, pressed icon button, selected menu item                                    |
+| `--line`        | `#E7E7EA` | `#222226` | Hairlines: table rows, panel borders                                                         |
+| `--line-2`      | `#DCDCE0` | `#2C2C31` | Button and segmented borders, popover edges                                                  |
+| `--line-strong` | `#84848E` | `#68686F` | **Input and select boundaries** — 3.31 / 3.20 worst case                                     |
+| `--seg-on`      | `#FFFFFF` | `#2C2C32` | A chosen segment and a keypad key — always lighter than the track it sits on, in both themes |
+| `--seg-ring`    | `#DCDCE0` | `#3F3F46` | The hairline round that chosen segment or key                                                |
 
 The main column is `--surface` and the sidebar `--bg`, so content leads and chrome recedes; a
 panel is found by its hairline, not a shadow.
@@ -316,7 +318,13 @@ a middle-click and script-off all work.
   backdrop click closes. A 30rem centred dialog on a desktop, a bottom sheet on a phone. Opened
   from the sidebar, the phone's add tab, `N`, the command menu and any transaction row. A
   successful post refreshes the page underneath in place (`invalidateAll`) and never navigates;
-  the next add starts from the last one's answers. While a save is in flight the sheet holds: a
+  the next add starts from the last one's answers. **On a phone the sheet brings its own amount
+  keypad** — digits, `00`, the point, delete and a tall Add (or Save) key — because the system's
+  decimal keypad has no return key and would cover the bucket, the category and the submit. The
+  amount field then never raises the system keyboard (`inputmode="none"`); the fields scroll above
+  the keypad and the keypad stays above the home indicator. The keypad's arithmetic is string work
+  in `keyAmount` (`money.ts`): one point, two decimals, no leading zeros, grouped as it grows. While
+  a save is in flight the sheet holds: a
   second submit is dropped and it cannot be dismissed, so an entry is never posted twice or lost.
   Only a press that starts on the backdrop closes it — a text selection dragged out of a field
   does not.
@@ -397,7 +405,8 @@ fade in, hovers ease. `prefers-reduced-motion` removes all of it.
 
 On a phone: the ledger is a two-line list (what and how much; then bucket and note) under
 sunk day headers; Recent on home is the same shape; KPIs go two to a row without sparklines;
-bucket rows put the bar on its own line; the sheet is a bottom sheet over the tab bar; the entry
+bucket rows put the bar on its own line; the sheet is a bottom sheet over the tab bar with its own
+amount keypad; the browser's tap flash is off on controls that show their own pressed state; the entry
 bar only appears when linked to or after a failed submit. Wide tables (plan vs actual, month by
 month, periods) scroll sideways inside their panel. The tab bar reserves
 `env(safe-area-inset-bottom)`.

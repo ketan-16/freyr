@@ -6,6 +6,8 @@ import {
 	mulBP,
 	parseMoney,
 	parsePercentBP,
+	groupTyped,
+	keyAmount,
 	toAmountInput
 } from './money';
 
@@ -135,5 +137,55 @@ describe('toAmountInput', () => {
 	it('refuses a negative or fractional amount', () => {
 		expect(() => toAmountInput(-1)).toThrow();
 		expect(() => toAmountInput(1.5)).toThrow();
+	});
+});
+
+describe('groupTyped', () => {
+	it('groups whole rupees the Indian way and keeps decimals as typed', () => {
+		expect(groupTyped('125050.5')).toBe('1,25,050.5');
+		expect(groupTyped('1234567')).toBe('12,34,567');
+		expect(groupTyped('999')).toBe('999');
+		expect(groupTyped('.5')).toBe('0.5');
+		expect(groupTyped('')).toBe('');
+	});
+});
+
+describe('keyAmount', () => {
+	const type = (keys: string[]) => keys.reduce(keyAmount, '');
+
+	it('builds a grouped amount digit by digit', () => {
+		expect(type(['1', '2', '5', '0', '5', '0'])).toBe('1,25,050');
+		expect(type(['5', '00'])).toBe('500');
+	});
+
+	it('takes one point and at most two decimals', () => {
+		expect(type(['.', '5'])).toBe('0.5');
+		expect(type(['1', '2', '.', '5', '0', '9'])).toBe('12.50');
+		expect(type(['1', '.', '.', '5'])).toBe('1.5');
+		expect(type(['1', '.', '5', '00'])).toBe('1.50');
+	});
+
+	it('drops leading zeros but keeps a lone zero', () => {
+		expect(type(['0'])).toBe('0');
+		expect(type(['0', '0'])).toBe('0');
+		expect(type(['00'])).toBe('0');
+		expect(type(['0', '7'])).toBe('7');
+	});
+
+	it('deletes the last character typed', () => {
+		expect(keyAmount('1,250', 'del')).toBe('125');
+		expect(keyAmount('12.', 'del')).toBe('12');
+		expect(keyAmount('', 'del')).toBe('');
+	});
+
+	it('stops at nine whole-rupee digits', () => {
+		expect(type(['9', '9', '9', '9', '9', '9', '9', '9', '9', '9'])).toBe('99,99,99,999');
+		expect(type(['1', '2', '3', '4', '5', '6', '7', '8', '00'])).toBe('1,23,45,678');
+	});
+
+	// The point of the exercise: what the keypad builds, the server can read.
+	it('always yields what parseMoney reads back exactly', () => {
+		expect(parseMoney(type(['1', '2', '5', '0', '.', '5']))).toBe(125050);
+		expect(parseMoney(type(['2', '00', '00']))).toBe(2000000);
 	});
 });

@@ -14,7 +14,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { todayISO } from '$lib/dates';
-	import { formatMoney, parseMoney, toAmountInput } from '$lib/money';
+	import { formatMoney, groupTyped, keyAmount, parseMoney, toAmountInput } from '$lib/money';
 	import type { Category, CategoryScope } from '$lib/server/categories';
 	import type { Bucket, Direction, Source, Txn } from '$lib/server/ledger';
 	import Icon from './Icon.svelte';
@@ -30,6 +30,7 @@
 		onDone,
 		onCancel,
 		cancelHref,
+		keypad = false,
 		busy = $bindable(false)
 	}: {
 		categories: Category[];
@@ -45,6 +46,8 @@
 		onDone?: (message: string, answers: Record<string, string>) => void;
 		onCancel?: () => void;
 		cancelHref?: string;
+		/** Offer the amount keypad on a phone (the sheet does; the edit page does not). */
+		keypad?: boolean;
 		/** True from submit until the result lands; the sheet will not close meanwhile. */
 		busy?: boolean;
 	} = $props();
@@ -61,7 +64,8 @@
 						bucket: txn.bucket ?? 'needs',
 						source: txn.incomeSource ?? 'job',
 						category: txn.categoryId == null ? '' : String(txn.categoryId),
-						amount: toAmountInput(txn.amountPaise),
+						// Grouped for reading ("1,250.50"); parseMoney takes it back as is.
+						amount: groupTyped(toAmountInput(txn.amountPaise)),
 						date: txn.date,
 						note: txn.note ?? ''
 					}
@@ -110,7 +114,26 @@
 	 * belongs to; the server still refuses a pair that does not match.
 	 */
 	let live = $state(false);
-	onMount(() => (live = true));
+	/**
+	 * A phone gets its own amount keypad. The system's decimal keypad has no
+	 * return key and covers the rest of the sheet — bucket, category, the add
+	 * button — so it would have to be dismissed before every entry could finish.
+	 */
+	let phone = $state(false);
+	onMount(() => {
+		live = true;
+		const query = matchMedia('(pointer: coarse) and (max-width: 40rem)');
+		phone = query.matches;
+		const follow = () => (phone = query.matches);
+		query.addEventListener('change', follow);
+		return () => query.removeEventListener('change', follow);
+	});
+	const pad = $derived(keypad && phone && !readOnly);
+
+	function press(key: string): void {
+		amount = keyAmount(amount, key);
+		error = '';
+	}
 	const SCOPE_NAMES: Record<string, string> = {
 		needs: 'Needs',
 		wants: 'Wants',
@@ -251,19 +274,20 @@
 
 		<div class="field">
 			<label for="{uid}-amount">Amount</label>
-			<div class="amount-field">
+			<div class="amount-field" class:pad>
 				<span class="cur" aria-hidden="true">₹</span>
+				<!-- With the keypad, tapping the field must not raise the system keyboard. -->
 				<input
 					id="{uid}-amount"
 					name="amount"
 					bind:value={amount}
-					inputmode="decimal"
+					inputmode={pad ? 'none' : 'decimal'}
 					autocomplete="off"
 					placeholder="0"
 					required
 					readonly={readOnly}
 					aria-describedby={error ? `${uid}-err` : undefined}
-					data-autofocus
+					data-autofocus={pad ? undefined : ''}
 				/>
 			</div>
 		</div>
@@ -383,30 +407,61 @@
 		{#if error}<p class="error" id="{uid}-err" role="alert">{error}</p>{/if}
 	</div>
 
-	<div class="sheet-f">
-		{#if txn && deleteAction}
+	{#if !pad || (txn && deleteAction)}
+		<div class="sheet-f">
+			{#if txn && deleteAction}
+				<button
+					class="btn {armed ? 'danger' : 'ghost'}"
+					type="submit"
+					form="{uid}-del"
+					disabled={busy}
+					onclick={confirmDelete}
+				>
+					<Icon name="trash" />{armed ? 'Confirm delete' : 'Delete'}
+				</button>
+			{/if}
+			{#if !pad}
+				<span class="spacer"></span>
+				{#if onCancel}
+					<button class="btn ghost" type="button" onclick={onCancel}>Cancel</button>
+				{:else if cancelHref}
+					<a class="btn ghost" href={cancelHref}>Cancel</a>
+				{/if}
+				{#if !readOnly}
+					<button class="btn primary" type="submit" disabled={busy}>
+						{txn ? 'Save' : 'Add'}<kbd>↵</kbd>
+					</button>
+				{/if}
+			{/if}
+		</div>
+	{/if}
+
+	{#if pad}
+		<!--
+		  The phone's keypad: digits, 00 and the point write into the amount
+		  above; the tall key submits. Always in reach of the thumb, and never
+		  covering the category it has to be filed under.
+		-->
+		<div class="keypad" role="group" aria-label="Amount keypad">
+			{#each ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '00'] as k (k)}
+				<button
+					class="key"
+					type="button"
+					onclick={() => press(k)}
+					aria-label={k === '.' ? 'Decimal point' : k === '00' ? 'Double zero' : k}>{k}</button
+				>
+			{/each}
 			<button
-				class="btn {armed ? 'danger' : 'ghost'}"
-				type="submit"
-				form="{uid}-del"
-				disabled={busy}
-				onclick={confirmDelete}
+				class="key key-del"
+				type="button"
+				onclick={() => press('del')}
+				aria-label="Delete last digit"
 			>
-				<Icon name="trash" />{armed ? 'Confirm delete' : 'Delete'}
+				<Icon name="delete" size={22} />
 			</button>
-		{/if}
-		<span class="spacer"></span>
-		{#if onCancel}
-			<button class="btn ghost" type="button" onclick={onCancel}>Cancel</button>
-		{:else if cancelHref}
-			<a class="btn ghost" href={cancelHref}>Cancel</a>
-		{/if}
-		{#if !readOnly}
-			<button class="btn primary" type="submit" disabled={busy}>
-				{txn ? 'Save' : 'Add'}<kbd>↵</kbd>
-			</button>
-		{/if}
-	</div>
+			<button class="key key-ok" type="submit" disabled={busy}>{txn ? 'Save' : 'Add'}</button>
+		</div>
+	{/if}
 </form>
 
 {#if txn && deleteAction}

@@ -49,6 +49,10 @@
 	--muted-series: #b4b4bc;
 	--grid: #efeff1;
 
+	/* the chosen segment of a segmented control, raised off its sunk track */
+	--seg-on: #ffffff;
+	--seg-ring: #dcdce0;
+
 	--shadow-sm: 0 1px 2px rgb(9 9 11 / 0.06);
 	--shadow-pop: 0 12px 32px -8px rgb(9 9 11 / 0.18), 0 2px 6px rgb(9 9 11 / 0.06);
 	--backdrop: rgb(9 9 11 / 0.32);
@@ -122,6 +126,10 @@
 	--muted-series: #4a4a52;
 	--grid: #1c1c20;
 
+	/* lighter than the track, as in light mode — never darker */
+	--seg-on: #2c2c32;
+	--seg-ring: #3f3f46;
+
 	--shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
 	--shadow-pop: 0 16px 40px -8px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.4);
 	--backdrop: rgb(0 0 0 / 0.6);
@@ -163,6 +171,9 @@
 		--invest: #199e70;
 		--muted-series: #4a4a52;
 		--grid: #1c1c20;
+
+		--seg-on: #2c2c32;
+		--seg-ring: #3f3f46;
 
 		--shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
 		--shadow-pop: 0 16px 40px -8px rgb(0 0 0 / 0.7), 0 2px 8px rgb(0 0 0 / 0.4);
@@ -986,10 +997,38 @@ input.pct {
 }
 
 @media (pointer: coarse) {
+	/* Controls with their own pressed and chosen states skip the browser's
+	   tap flash, which otherwise washes over a chip as it turns ink. */
+	.chips label,
+	.seg label,
+	.seg a,
+	.key,
+	.btn,
+	.icon-btn,
+	.tabbar a,
+	.nav-item,
+	.t-txn tr.click,
+	.t-recent a {
+		-webkit-tap-highlight-color: transparent;
+	}
+
 	input:not([type='radio'], [type='checkbox'], [type='hidden']),
 	select,
 	textarea {
 		font-size: 1rem;
+	}
+
+	/* iOS gives a native date field an intrinsic width wider than its column;
+	   without the native appearance it takes the column's width like any field. */
+	input[type='date'] {
+		-webkit-appearance: none;
+		appearance: none;
+		min-width: 0;
+	}
+
+	/* A key hint means nothing without a keyboard. */
+	.btn kbd {
+		display: none;
 	}
 }
 
@@ -1072,10 +1111,10 @@ input.pct {
 }
 
 .seg input:checked + span {
-	background: var(--surface);
+	background: var(--seg-on);
 	box-shadow:
 		var(--shadow-sm),
-		0 0 0 1px var(--line-2);
+		0 0 0 1px var(--seg-ring);
 	color: var(--ink);
 }
 
@@ -1106,10 +1145,10 @@ input.pct {
 }
 
 .seg a[aria-current='true'] {
-	background: var(--surface);
+	background: var(--seg-on);
 	box-shadow:
 		var(--shadow-sm),
-		0 0 0 1px var(--line-2);
+		0 0 0 1px var(--seg-ring);
 	color: var(--ink);
 }
 
@@ -2054,6 +2093,77 @@ dialog[open] {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
 	gap: var(--s-3);
+}
+
+.amount-field input::placeholder {
+	color: var(--ink-faint);
+	font-weight: 500;
+}
+
+/* The keypad writes here, so the field shows it is the one being filled. */
+.amount-field.pad {
+	border-color: var(--ink);
+}
+
+/* The phone's amount keypad: three columns of keys, delete and a tall submit
+   on the fourth. Rendered only on a phone, inside the add sheet. */
+.keypad {
+	display: grid;
+	flex: none;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	/* Shorter keys on a short phone, so the fields above keep their room. */
+	grid-auto-rows: clamp(2.5rem, 6.2dvh, 3.25rem);
+	gap: 6px;
+	padding: var(--s-2) var(--s-3) calc(var(--s-2) + env(safe-area-inset-bottom));
+	border-top: 1px solid var(--line);
+	background: var(--sunk);
+}
+
+.key {
+	display: grid;
+	place-items: center;
+	padding: 0;
+	border: 0;
+	border-radius: var(--r-lg);
+	/* Raised off the tray in both themes, like a chosen segment. */
+	background: var(--seg-on);
+	box-shadow:
+		var(--shadow-sm),
+		0 0 0 1px var(--seg-ring);
+	color: var(--ink);
+	font-size: 1.375rem;
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+	touch-action: manipulation;
+	user-select: none;
+}
+
+.key:active {
+	background: var(--active);
+}
+
+.key-del {
+	grid-column: 4;
+	grid-row: 1;
+	color: var(--ink-2);
+}
+
+.key-ok {
+	grid-column: 4;
+	grid-row: 2 / span 3;
+	background: var(--ink);
+	box-shadow: none;
+	color: var(--on-ink);
+	font-size: 1rem;
+	font-weight: 600;
+}
+
+.key-ok:active {
+	background: color-mix(in srgb, var(--ink) 82%, var(--surface));
+}
+
+.key-ok:disabled {
+	opacity: 0.5;
 }
 
 .sheet .linked {
@@ -3380,6 +3490,36 @@ a.set-item:hover {
 
 	dialog.sheet[open] {
 		animation: sheet-up 0.2s var(--ease);
+	}
+
+	/* With the keypad, the sheet is a column: the fields scroll, the keypad
+	   (and its submit key) stays put above the home indicator. */
+	.sheet[open]:has(.keypad) {
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		padding-bottom: 0;
+	}
+
+	.sheet:has(.keypad) .txn-form {
+		display: flex;
+		flex: 1 1 auto;
+		flex-direction: column;
+		min-height: 0;
+	}
+
+	.sheet:has(.keypad) .sheet-b {
+		flex: 1 1 auto;
+		gap: var(--s-3);
+		min-height: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		padding-bottom: var(--s-3);
+	}
+
+	.sheet:has(.keypad) .sheet-f {
+		position: static;
+		padding-block: var(--s-2);
 	}
 
 	.cmd {

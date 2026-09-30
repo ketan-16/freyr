@@ -67,6 +67,44 @@ export function toAmountInput(p: Paise): string {
 		: `${Math.trunc(p / 100)}.${String(paise).padStart(2, '0')}`;
 }
 
+/**
+ * A typed amount with its whole rupees grouped the Indian way and its
+ * decimals left exactly as typed: "125050.5" → "1,25,050.5". Display only —
+ * parseMoney reads the grouped form straight back.
+ */
+export function groupTyped(typed: string): string {
+	const [whole, frac] = typed.replaceAll(',', '').split('.');
+	const grouped = whole === '' ? '' : groupIndian(whole);
+	return frac === undefined ? grouped : `${grouped || '0'}.${frac}`;
+}
+
+/** Whole-rupee digits the keypad accepts: up to ₹99,99,99,999. */
+const KEYPAD_WHOLE_DIGITS = 9;
+
+/**
+ * One press of the phone keypad applied to a typed amount: a digit, "00",
+ * "." or "del". String work only — the amount never becomes a number here —
+ * and the result is always something parseMoney accepts once it has a digit:
+ * one point, at most two decimals, no leading zeros, grouped for reading.
+ */
+export function keyAmount(typed: string, key: string): string {
+	let raw = typed.replaceAll(',', '');
+	if (key === 'del') {
+		raw = raw.slice(0, -1);
+	} else if (key === '.') {
+		if (!raw.includes('.')) raw = `${raw || '0'}.`;
+	} else if (/^\d+$/.test(key)) {
+		const dot = raw.indexOf('.');
+		if (dot >= 0) {
+			raw += key.slice(0, Math.max(0, 2 - (raw.length - dot - 1)));
+		} else {
+			const whole = (raw + key).replace(/^0+(?=\d)/, '');
+			if (whole.length <= KEYPAD_WHOLE_DIGITS) raw = whole;
+		}
+	}
+	return groupTyped(raw);
+}
+
 function groupIndian(digits: string): string {
 	if (digits.length <= 3) return digits;
 	let head = digits.slice(0, -3);

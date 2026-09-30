@@ -81,6 +81,7 @@
 			deleteAction={txn ? `/ledger/${txn.id}?/delete` : undefined}
 			onDone={done}
 			onCancel={() => (ui.sheetOpen = false)}
+			keypad
 			bind:busy
 		/>
 	{/if}

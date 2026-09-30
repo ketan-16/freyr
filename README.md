@@ -51,8 +51,9 @@ colour money figures, and amber marks focus and caution.
 
 - **Add from anywhere** — the sidebar's _New transaction_, the phone's centre tab, or `N` opens the
   add sheet (a bottom sheet on a phone): direction, amount, bucket, a category chip, date, note.
-  It saves without leaving the page, refreshes the figures underneath in place, and starts the
-  next entry from the last one's answers.
+  On a phone it has its own amount keypad with a big Add key, so the system keyboard never covers
+  the form. It saves without leaving the page, refreshes the figures underneath in place, and
+  starts the next entry from the last one's answers.
 - **Edit and delete** — any transaction row opens the same sheet with its values; delete takes a
   confirming second press. Rows linked to a goal or a lending keep their direction.
 - **⌘K** jumps to any screen, any recent month or year, or runs an action. `g` then a letter
