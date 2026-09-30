@@ -1,13 +1,26 @@
 <!--
-  The transaction-add form. Shared by the ledger and the home command centre so
-  the two cannot drift. It sits directly above the table it feeds, so a new row
-  appears where the eye already is (DESIGN.md § entry-bar).
+  The ledger's entry bar: the add form as one toolbar row above the table it
+  feeds, for a run of entries without leaving the keyboard — after each add the
+  amount field takes focus again. On a phone the add sheet is the form, so this
+  shows only when linked to (#new, the no-script path of the add tab) or when a
+  submit failed.
 -->
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import type { Category, CategoryScope } from '$lib/server/categories';
 	import type { Bucket, Direction, Source } from '$lib/server/ledger';
+	import Icon from './Icon.svelte';
+	import Notice from './Notice.svelte';
+
+	const SCOPE_NAMES: Record<string, string> = {
+		needs: 'Needs',
+		wants: 'Wants',
+		investments: 'Investments',
+		job: 'Job',
+		side_hustle: 'Side hustle',
+		other: 'Other'
+	};
 
 	let {
 		action,
@@ -18,76 +31,98 @@
 		action: string;
 		entry: { today: string; categories: Category[] };
 		values?: Record<string, string>;
-		/**
-		 * The failed submission's message. It lives here rather than beside the
-		 * bar on each page so it is announced and tied to the amount field from
-		 * one place — `use:enhance` never reloads, so an unassociated message is
-		 * silent to a screen reader.
-		 */
+		/** The failed submission's message, announced and tied to the amount field. */
 		error?: string;
 	} = $props();
 
 	let amountInput: HTMLInputElement | undefined = $state();
+	/** A second Enter while the first add is in flight would post it twice. */
+	let busy = $state(false);
 
-	/**
-	 * Seeded once from the last submission, then owned by the selects. It is
-	 * read untracked because a later `values` must not move a control the user
-	 * is looking at: with JS the failed submit leaves their answers on screen,
-	 * and without it the server re-renders a fresh component that seeds here.
-	 */
+	/** Seeded once from the last submission, then owned by the controls. */
 	const posted = untrack(() => values) ?? {};
 	let direction = $state<Direction>((posted.direction as Direction) ?? 'outflow');
 	let bucket = $state<Bucket>((posted.bucket as Bucket) ?? 'needs');
 	let source = $state<Source>((posted.source as Source) ?? 'job');
 
-	/**
-	 * A category belongs to one bucket or one income source, so the answer just
-	 * given decides the list. Every category ships with the page and the filter
-	 * runs here: changing bucket re-narrows the dropdown with no round trip.
-	 */
+	/** A category belongs to one bucket or source: the answer just given decides the list. */
 	const scope = $derived<CategoryScope>(direction === 'income' ? source : bucket);
 	const options = $derived(entry.categories.filter((c) => c.scope === scope));
+
+	/**
+	 * Script narrows the list as the bucket changes. Without it nothing would,
+	 * so until the page runs every category is offered, grouped by what it
+	 * belongs to — and the server still refuses a mismatched pair.
+	 */
+	let live = $state(false);
+	onMount(() => (live = true));
+	const groups = $derived(
+		[...new Set(entry.categories.map((c) => c.scope))].map((s) => ({
+			scope: s,
+			label: SCOPE_NAMES[s] ?? s,
+			categories: entry.categories.filter((c) => c.scope === s)
+		}))
+	);
 </script>
 
-<details class="entry-wrap" open>
-	<summary>Add transaction</summary>
+<div class="entry-wrap" id="new" class:show={Boolean(error)}>
 	<form
 		class="entry"
 		method="POST"
 		{action}
-		use:enhance={() =>
-			async ({ update }) => {
+		use:enhance={({ cancel }) => {
+			if (busy) {
+				cancel();
+				return;
+			}
+			busy = true;
+			return async ({ update }) => {
 				await update();
+				busy = false;
 				amountInput?.focus();
-			}}
+			};
+		}}
 	>
-		<div class="field">
+		<div class="field f-date">
 			<label for="e-date">Date</label>
 			<input id="e-date" name="date" type="date" value={values?.date ?? entry.today} required />
 		</div>
-		<div class="field">
-			<label for="e-amount">Amount ₹</label>
-			<input
-				id="e-amount"
-				class="money"
-				name="amount"
-				bind:this={amountInput}
-				value={values?.amount ?? ''}
-				inputmode="decimal"
-				autocomplete="off"
-				aria-describedby={error ? 'e-error' : undefined}
-				required
-			/>
+		<div class="field f-amount">
+			<label for="e-amount">Amount</label>
+			<span class="affix">
+				<span class="pre" aria-hidden="true">₹</span>
+				<input
+					id="e-amount"
+					class="money"
+					name="amount"
+					bind:this={amountInput}
+					value={values?.amount ?? ''}
+					inputmode="decimal"
+					autocomplete="off"
+					aria-describedby={error ? 'e-error' : undefined}
+					required
+				/>
+			</span>
 		</div>
-		<div class="field">
-			<label for="e-direction">Direction</label>
-			<select id="e-direction" name="direction" bind:value={direction}>
-				<option value="outflow">Outflow</option>
-				<option value="income">Income</option>
-			</select>
+		<!-- A labelled group rather than a fieldset: a legend will not sit on the
+		     toolbar's label line. -->
+		<div class="field f-direction" role="radiogroup" aria-labelledby="e-direction">
+			<span class="label" id="e-direction">Direction</span>
+			<div class="seg">
+				<label>
+					<input type="radio" name="direction" value="outflow" bind:group={direction} />
+					<span>Out</span>
+				</label>
+				<label>
+					<input type="radio" name="direction" value="income" bind:group={direction} />
+					<span>In</span>
+				</label>
+			</div>
 		</div>
-		{#if direction === 'outflow'}
-			<div class="field">
+		<!-- Script swaps bucket for source as the direction changes; without it
+		     both stay, and the server reads the one the direction names. -->
+		{#if !live || direction === 'outflow'}
+			<div class="field f-scope">
 				<label for="e-bucket">Bucket</label>
 				<select id="e-bucket" name="bucket" bind:value={bucket}>
 					<option value="needs">Needs</option>
@@ -95,52 +130,51 @@
 					<option value="investments">Investments</option>
 				</select>
 			</div>
-		{:else}
-			<div class="field">
+		{/if}
+		{#if !live || direction === 'income'}
+			<div class="field f-scope">
 				<label for="e-source">Source</label>
-				<!--
-				  Only job and side_hustle here: every rollup — monthly allocation,
-				  the yearly split — counts those two, so income booked as 'other'
-				  would show green in the ledger while the month still read as
-				  awaiting income. The enum keeps 'other' for imported rows; do not
-				  offer it until the rollups count it.
-				-->
+				<!-- Only the two sources every rollup counts; `other` stays for imports. -->
 				<select id="e-source" name="source" bind:value={source}>
 					<option value="job">Job</option>
 					<option value="side_hustle">Side hustle</option>
 				</select>
 			</div>
 		{/if}
-		<div class="field">
+		<div class="field f-category">
 			<label for="e-category">Category</label>
-			<!--
-			  Required, and empty when the scope has no categories yet: the browser
-			  blocks the submit on the placeholder, and the notice below says where
-			  to add one.
-			-->
 			<select id="e-category" name="category" required>
-				{#each options as c (c.id)}
-					<option value={c.id} selected={values?.category === String(c.id)}>{c.name}</option>
+				{#if live}
+					{#each options as c (c.id)}
+						<option value={c.id} selected={values?.category === String(c.id)}>{c.name}</option>
+					{:else}
+						<option value="" disabled selected>—</option>
+					{/each}
 				{:else}
-					<option value="" disabled selected>—</option>
-				{/each}
+					{#each groups as g (g.scope)}
+						<optgroup label={g.label}>
+							{#each g.categories as c (c.id)}
+								<option value={c.id} selected={values?.category === String(c.id)}>{c.name}</option>
+							{/each}
+						</optgroup>
+					{/each}
+				{/if}
 			</select>
 		</div>
-		<div class="field grow">
+		<div class="field f-note">
 			<label for="e-note">Note</label>
 			<input id="e-note" name="note" value={values?.note ?? ''} autocomplete="off" />
 		</div>
-		<button class="primary" type="submit">Add</button>
+		<button class="btn primary f-submit" type="submit" disabled={busy}>
+			<Icon name="plus" />Add
+		</button>
 	</form>
-	{#if !options.length}
-		<p class="notice">
-			Nothing to file this under yet — <a href="/settings/categories">add a category</a>.
-		</p>
+	{#if live && !options.length}
+		<div class="entry-msg">
+			<Notice tone="warn">
+				Nothing to file this under yet — <a href="/settings/categories">add a category</a>.
+			</Notice>
+		</div>
 	{/if}
-	<!--
-	  Outside the flex form so it takes its own line, and announced on insertion:
-	  the failed submit returns focus to the amount field, which describes itself
-	  with this message.
-	-->
-	{#if error}<p class="error" id="e-error" role="alert">{error}</p>{/if}
-</details>
+	{#if error}<p class="error entry-msg" id="e-error" role="alert">{error}</p>{/if}
+</div>

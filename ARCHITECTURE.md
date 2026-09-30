@@ -18,28 +18,39 @@ src/hooks.server.ts            — boot: open+migrate db once, rebuild the budge
                                  (no users → /setup, unauthenticated → /login),
                                  theme cookie → <html data-theme> via transformPageChunk,
                                  hourly backup timer
-src/app.css                    — the whole stylesheet: design tokens (both themes),
-                                 shell, page head, panel grid, tables (column rhythm),
-                                 forms, responsive rules. Implements DESIGN.md
+src/app.css                    — the whole stylesheet: tokens (both themes), shell, page
+                                 header, 12-column grid (container queries), panels, controls,
+                                 tables, the chart system, dialogs, responsive rules.
+                                 Implements DESIGN.md
 src/lib/money.ts               — integer-paise money: parse ("1,23,456.78" → paise),
-                                 Indian-grouped format, basis-point math (mulBP)
-src/lib/dates.ts               — YYYY-MM-DD string helpers (no Date-object state), plus
-                                 the display labels monthLabel and shortDate
+                                 Indian-grouped format, basis-point math (mulBP), and
+                                 toAmountInput (paise → the plain decimal a field posts back)
+src/lib/dates.ts               — YYYY-MM-DD string helpers (no Date-object state), display
+                                 labels (monthLabel, shortDate, dayLabel, shortMonth), weekday,
+                                 addMonths
 src/lib/format.ts              — figure presentation: formatCell (zero → em dash, inflows
-                                 signed) and delta (arrow = direction, class = good news)
-src/lib/progress.ts            — meter thresholds (brand <80%, amber 80–100%, loss >100%)
-                                 and, over the cap, the rescaled fill + excess widths
-src/lib/components/            — FreyrMark (the logo, traced vector), Icon (Lucide subset,
-                                 inline paths), ThemeToggle (form action, no client state),
-                                 Money/Delta/Meter (one figure each, rules from format.ts
-                                 and progress.ts), EntryBar (the add form, shared by
-                                 /ledger and home)
+                                 signed), delta (arrow = direction, class = good news),
+                                 formatCompact (₹9.5K / ₹1.2L / ₹1.5Cr), share (whole percent)
+src/lib/progress.ts            — meter thresholds and, over the cap, the rescaled fill + excess
+src/lib/chart.ts               — chart geometry, pure: niceScale (1/2/2.5/5 ticks), pct,
+                                 cumulative, linePath/areaPath in a 0–100 viewBox
+src/lib/ui.svelte.ts           — the shell's client state (sheet, command menu, toasts) as a
+                                 class with $state fields, provided per app through context;
+                                 isTyping / wantsNewTab helpers for shortcuts and links
+src/lib/components/            — shell: PageHeader, Stepper (+ MonthNav), TxnSheet, TxnForm,
+                                 CommandMenu, EntryBar, ThemeToggle, FreyrMark, Icon (Lucide
+                                 paths); figures: Money, Delta, Kpi, Bullet, ShareBar, Notice;
+                                 charts: PaceChart, DailyChart, MonthChart, SplitChart,
+                                 Sparkline, Ranks
 src/lib/server/db/             — open (WAL, busy_timeout, foreign_keys), migration runner,
                                  SQLITE_CONSTRAINT_UNIQUE; migrations bundled via Vite
                                  ?raw glob (fs fallback for tsx)
 src/lib/server/auth.ts         — users (bcryptjs), sessions (sha256 token at rest, 90d)
-src/lib/server/ledger.ts       — transactions CRUD + validation,
-                                 monthly/yearly rollups (conditional aggregation, one query)
+src/lib/server/ledger.ts       — transactions: create, get, update (form-owned fields only),
+                                 delete, list; monthly/yearly rollups (conditional
+                                 aggregation, one query)
+src/lib/server/insights.ts     — read-only chart data: dailyTotals, monthlyTotals over any
+                                 range, outflowByCategory — one grouped query each
 src/lib/server/categories.ts   — categories scoped to a bucket or an income source:
                                  list/create/rename/archive/delete, usage counts
 src/lib/server/budgets.ts      — budget periods (basis points), activeFor/periodFor,
@@ -52,17 +63,18 @@ src/lib/server/promotions.ts   — the promotion log, and the projection of budg
 src/lib/server/goals.ts        — goals & pots, locations, goalProgress (grouped, no N+1)
 src/lib/server/comparison.ts   — prior-period fold: same span of days when in progress, whole
                                  once complete — shared by home, monthly and yearly
-src/lib/server/txn-form.ts     — form values → transaction; shared create-action wrapper and
-                                 EntryBar's options, so neither can drift by page
+src/lib/server/txn-form.ts     — form values → transaction, for create and update alike;
+                                 the shared create/update actions and the entry options
 src/lib/server/registry.ts     — lendings + openLendingsTotal; insert helpers for
                                  insurance/purchases/cards/SIP/emergency (import targets)
 src/lib/server/backup.ts       — daily VACUUM INTO backups/freyr-YYYY-MM-DD.db, keep 30
 src/lib/server/importer/       — one-time Excel seed import (exceljs), per-sheet modules,
                                  single transaction, idempotent-by-refusal
 src/routes/                    — thin +page.server.ts (parse → domain → return/redirect):
-                                 / (home), /ledger, /monthly, /yearly, /settings/budget,
+                                 / (home), /ledger, /ledger/[id] (edit + delete), /monthly,
+                                 /yearly, /settings (hub), /settings/budget,
                                  /settings/categories, /login, /setup, /logout,
-                                 /theme (POST: set cookie, bounce back)
+                                 /theme (POST: set cookie, bounce back); +error.svelte
 scripts/import.ts              — CLI import entry (tsx) with verification report
 scripts/dump-workbook.ts       — dev utility: dump an xlsx's raw cell layout
 ```
@@ -109,15 +121,24 @@ Money columns are
 Request → `hooks.server.ts` (db + session + guard) → `load`/action in `+page.server.ts`
 (thin) → `src/lib/server/*` domain function (validation + hand-written SQL) → rendered
 page. Forms POST to named actions and redirect (303) preserving filters; `use:enhance`
-makes that feel instant and refocuses the amount field for keyboard-first entry. Validation
-errors return `fail(400, { error, values })` so the form re-renders with what was typed. Every
-form renders that message as a `role="alert"` — `use:enhance` never reloads, so an unannounced
-message would be silent — below its own controls, so feedback follows the action. The one
-exception is a row delete: its form is a single button inside a `<td>`, with no control the
-message could sit under and no room in the row for it, so `/settings/budget` renders it above the
-table it belongs to. Where focus returns to a control (the entry bar's amount field), that control
-points at the message with `aria-describedby`. Pages with several forms tag the failure
-(`failed: 'addPromotion'`) so only the one that failed re-renders it.
+makes that feel instant. Validation errors return `fail(400, { error, values })` so the form
+re-renders with what was typed, under its own controls, as a `role="alert"`. Pages with several
+forms tag the failure (`failed: 'addPromotion'`) so only the one that failed re-renders it.
+
+**The add/edit sheet** lives in the root layout, so it opens from every screen. It posts to the
+ledger's existing `create` action (`/ledger?/create`) or to the edit route's `update` / `delete`
+(`/ledger/:id?/…`) and intercepts the result in its `use:enhance` callback: a redirect becomes
+`invalidateAll()` — every `load` on the current screen reruns and the figures change in place,
+with no navigation — and a failure stays inside the sheet as its own message, never touching the
+page's `form`. The categories it offers come from the root layout's `load`, which reruns exactly
+when a form action invalidates the page. Without script, the add controls are links to the
+ledger's entry bar and a row is a link to `/ledger/:id`, whose own actions redirect back to the
+ledger month it came from.
+
+**Chart data** is read alongside each page's figures: `insights.ts` adds one grouped query per
+chart (the month day by day, the months of a range, spend by category), each a range scan of
+`idx_transactions_date`, so a page costs months of rows however long the ledger grows. The
+ledger's daily strip is computed from the rows the page already has.
 
 ## Excel import design
 
@@ -174,7 +195,7 @@ from a raw dump of the real workbook:
   the message string would break on a SQLite upgrade.
 - **Presentation rules live in pure functions, not in components.** `format.ts` (zero → em
   dash, inflow sign, delta arrow vs colour) and `progress.ts` (meter thresholds and widths)
-  hold the rules; `Money`/`Delta`/`Meter` only render them. The reason is the test setup:
+  hold the rules; `Money`/`Delta`/`Bullet` only render them. The reason is the test setup:
   `vite.config.ts` defines a single `node` project that excludes `*.svelte.spec.ts`, so
   there is no component environment and a pure function is the only layer a test can reach.
   Rules that had been re-derived per page are what shipped `₹0.00` to the yearly page.
@@ -196,31 +217,38 @@ from a raw dump of the real workbook:
   properties; the dark theme re-declares them under `[data-theme='dark']` and again inside a
   `prefers-color-scheme` block for the no-cookie case. The duplication is deliberate — the
   alternative is a class-swap that flashes or a build step the stack rules out.
-- **Table columns are content-sized and share the leftover width.** Every cell is `width: 1%`
-  and nowrap and nothing is `width: auto`, so the browser sizes each column to its content and
-  splits the remainder between them in proportion. A 100%-wide auto-layout table otherwise
-  hands its slack to whichever column will take it, which on a wide screen put a row's name and
-  its figures a full display apart. Nominating a single absorber column was tried first and
-  merely relocated the hole. `.wrap` marks a free-text column as allowed to wrap without
-  claiming width. The phone reflow overrides both rules, because there the cells are a card's
-  lines rather than columns.
-- **Every top-level block on a page spans the full content width.** Page head, hero, KPI strip
-  and the panel grid share one left and right edge; a panel takes one grid track or, with
-  `.wide`, all of them. Three violations shipped together and read to the user as "randomly
-  misaligned": a KPI strip capped narrower than the panels below it, a panel sized to its own
-  table, and grid rows whose panels did not share a height. The check is mechanical — measure
-  every block's left and right edge — and is worth running after any layout change.
-- **Sections are laid out by a CSS grid, not by breakpoints.** `.panels` is
-  `repeat(auto-fit, minmax(min(36rem, 100%), 1fr))`, so two tables sit side by side exactly
-  when two will fit and stack otherwise — at any window size and any zoom level, with no media
-  query to keep in sync. The `min(…, 100%)` is load-bearing: an auto-fit track keeps its floor
-  even in a narrower container, which would overflow a phone by the difference.
-- **Tables reflow to cards on phones with the same markup.** `data-label` attributes drive
-  `::before` labels below 40rem; cells whose value is absent omit the attribute and are
-  hidden, so there is no second mobile template to keep in sync. The cost is that "no
-  attribute" means "no value": a cell that is not a labelled field needs an explicit
-  carve-out, which is why `td.empty` (the empty-state line) is excluded by name rather than
-  given a label it should not print.
+- **Charts are HTML and SVG laid out in percentages, rendered on the server.** No chart
+  library: bars, dots and labels are positioned elements, lines are SVG paths in a stretched
+  `0 0 100 100` viewBox with a non-scaling stroke, and the geometry comes from pure helpers in
+  `chart.ts`. Nothing is measured, so the server paints the final picture, the chart fits any
+  width with no layout shift, and a chart costs a few dozen elements and no dependency. The
+  trade-off is that marks cannot be sized in pixels relative to the plot (a bar is a share of its
+  slot, capped by `max-width`), which the dense layouts here never needed.
+- **Client UI state is a class in context, never a module singleton.** `ui.svelte.ts` holds the
+  sheet, the command menu and the toasts as `$state` fields on a `Ui` instance the root layout
+  creates and provides; pages reach it with `useUi()`. A module-level store would be shared
+  between requests during server render. It holds UI only — every figure still arrives by `load`.
+- **Editing has its own route rather than a flag on the ledger.** `/ledger/[id]` loads one row and
+  owns `update` and `delete`, so the edit form works without script, a row opened in a new tab is
+  a real page, and a failed save re-renders that page with the error instead of the ledger's entry
+  bar. With script the ledger opens the same `TxnForm` in the sheet and posts to the same actions.
+  `updateTransaction` rewrites only the fields the form owns — goal, location, lending and the
+  imported flag keep their stored values — and refuses to flip a goal contribution to income, or
+  to change a repayment's direction or source, since goal progress and the lending total cannot
+  tell which way a row flows and a repayment re-filed as job income would join every rollup. The ledger's old `delete` action is kept for compatibility.
+- **The shell scrolls the document, not an inner panel.** The sidebar is sticky and the page
+  header sticks under the viewport's top; browser scroll restoration, find-in-page, anchor jumps
+  (`#day-12`) and mobile browser chrome all behave natively. `scroll-padding-top` keeps an anchor
+  clear of the sticky header and table head.
+- **Layout follows the content width, not the viewport.** `.page` is an inline-size container and
+  the 12-column grid collapses by container query, so the icon rail or a narrow window gives the
+  same result as a phone of the same content width. Only the shell itself (sidebar → rail → tab
+  bar) switches on viewport breakpoints.
+- **The add form narrows its categories with script, and offers all of them without.** Once the
+  page runs, the category list follows the bucket or source; before it does (or with script off)
+  every category is offered grouped by what it belongs to. The server's scope check in
+  `txn-form.ts` refuses a mismatched pair either way, so the browser's list is a convenience, not
+  the rule.
 - **Design decisions live in [DESIGN.md](DESIGN.md)**, which is the target `src/app.css`
   implements. Colour choices there are contrast-verified rather than asserted.
 

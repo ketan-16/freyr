@@ -4,10 +4,10 @@ A self-hosted personal finance app — transaction ledger, budget tracking, goal
 planning tools, all in one place. Replaces a 12-sheet Excel workbook. Built to start small,
 grow over time, and stay snappy.
 
-> **Status:** Phase 0+1 complete — auth, transaction ledger, monthly/yearly budget views,
-> a raise policy and promotion log that project the budget periods, home dashboard, daily
-> backups, and the one-time Excel seed import all work. Phases 2–4 (goals UI, registries UI,
-> planners) are next.
+> **Status:** Phase 0+1 complete — auth, transaction ledger (add, edit, delete), monthly and
+> yearly budget views with charts, a raise policy and promotion log that project the budget
+> periods, home dashboard, daily backups, and the one-time Excel seed import all work. Phases 2–4
+> (goals UI, registries UI, planners) are next.
 
 ## Stack
 
@@ -17,53 +17,65 @@ rationale and [ARCHITECTURE.md](ARCHITECTURE.md) for how it's put together.
 
 ## Screens
 
-- **Home** — the command centre, not a summary page. One hero figure (what's left this month,
-  or spend-so-far when there is nothing yet to be left of) with a delta against the same span
-  of days last month; tiles for income, spent and lendings outstanding; the three buckets as
-  meters that rescale to show an overspend rather than clip at 100%, beside goal progress;
-  then the same add form the ledger uses, inline above recent activity, so a transaction
-  lands without leaving the page.
-- **Ledger** — every transaction for a month, filterable by month/year/bucket, with the same
-  add form above the table it feeds. Entry is four answers and a note: date, amount, where it
-  belongs (a bucket for an outflow, a source for income), and a category — and the category
-  dropdown holds only the categories that belong to what you just picked, so it stays short.
-- **Monthly** — allocated vs actual vs remaining per bucket, with month-over-month deltas.
-  Left/right arrows step the month while the stepper has focus.
-- **Yearly** — three tiles (income, spent, net) over three tables: allocation vs actual with
-  each bucket's allocated share, a month-by-month grid, and the income split. Months no
-  budget period covers are named rather than silently allocated zero.
-- **Budget settings** — you edit the **raise policy and the promotion log**, not raw periods:
-  a base split, a raise split, and one row per raise. The budget periods are projected from
-  those, so a promotion re-weights every month after it automatically. A period can still be
-  typed by hand to correct a single month, and a hand-typed one is never overwritten.
-- **Category settings** — the list behind that dropdown. Each category belongs to one bucket
-  or one income source; names are unique within that, so "Travel" can be both a need and a
-  want. Renaming carries every transaction filed under it. A category the ledger still points
-  at can only be archived — it leaves the dropdown and keeps its history — and delete is
-  offered only where nothing would lose its label.
+- **Home** — answers first: what is left to spend this month (or spend so far before payday), a
+  pace bar against the calendar, the change against last month over the same days, and a safe
+  daily amount. Beside it a **spending-pace chart** — this month's running total against last
+  month's, under the allocation. Then the month's figures with six-month sparklines, the three
+  buckets as bullets (spend against allocation, with a tick for how much of the month has gone),
+  where the money went by category, recent transactions and goal progress.
+- **Ledger** — a month as a statement: one heading per day with its totals, rows in statement
+  order (category, note, bucket, amount). A daily strip above it jumps to any day; a bucket filter
+  and an instant text filter narrow it; an entry bar adds rows without leaving the keyboard.
+  **Click any row to edit or delete it.**
+- **Budget** — a month's allocation against spend: income, allocated, spent and left, then a card
+  per bucket with its bullet, its categories ranked and its six-month trend, then the month day by
+  day, stacked by bucket.
+- **Year** — income, spent, net and average monthly spend against the year before; the twelve
+  months as income beside spend stacked by bucket; plan against actual per bucket; the income
+  split; the month-by-month table; and the year's categories ranked. Months no budget period
+  covers are named rather than silently allocated zero.
+- **Splits** — the raise policy and the promotion log that project the budget periods, with a
+  chart of the split over time (every raise pulls the weights toward the raise split). Each split
+  shows its total and proportion while you type. A period can still be typed by hand to correct a
+  single month, and a hand-typed one is never overwritten.
+- **Categories** — one column per bucket or income source, each with its own add field. Renaming
+  carries every transaction filed under it; a category the ledger still points at can only be
+  archived; delete is offered only where nothing would lose its label.
+- **Settings** — the way into Splits and Categories, the theme, the account, and the keyboard map.
 
 ## Interface
 
-Dense and keyboard-first: 33px table rows, 32px controls, tabular figures, and a month of
-transactions on one screen. Every screen opens the same way — name, the period it is showing,
-then its controls in the same right-hand corner — and every section is a panel with a heading
-of its own. Table columns take their content's width, with one column per table absorbing the
-slack, so a figure stays beside the row it belongs to instead of drifting to the far edge of a
-wide display; where two tables fit side by side, they sit side by side. The palette is cool
-neutral surfaces under a near-black evergreen rail, with green reserved for chrome and a
-separate, brighter green reserved for money — the two are held apart on both luminance and hue
-so a link can never be mistaken for a gain. Light and dark themes are both first-class — the
-theme is a cookie resolved during SSR, so there's no flash on load and the toggle works with
-JavaScript off. Responsive down to a phone, where the rail becomes a bottom tab bar and tables
-reflow to cards. Every colour pair is contrast-verified (text ≥ 4.5:1, UI boundaries ≥ 3:1) in
-both themes, against every surface it can legally sit on.
+Dense and keyboard-first, with charts as a first-class part of every screen. Colour carries data
+and nothing else: chrome is neutral ink, the three buckets own the only chart hues, green and red
+colour money figures, and amber marks focus and caution.
 
-The full spec — palette, type scale, components, responsive rules, and the logo — is
-[DESIGN.md](DESIGN.md).
+- **Add from anywhere** — the sidebar's _New transaction_, the phone's centre tab, or `N` opens the
+  add sheet (a bottom sheet on a phone): direction, amount, bucket, a category chip, date, note.
+  It saves without leaving the page, refreshes the figures underneath in place, and starts the
+  next entry from the last one's answers.
+- **Edit and delete** — any transaction row opens the same sheet with its values; delete takes a
+  confirming second press. Rows linked to a goal or a lending keep their direction.
+- **⌘K** jumps to any screen, any recent month or year, or runs an action. `g` then a letter
+  navigates (`g l` ledger, `g b` budget …), `[` and `]` step the month or year, `/` filters the
+  ledger. The full map is on the Settings screen.
+- **Charts** read on hover and on keyboard focus, and every chart has a table on the same screen
+  that carries its figures.
+- **Light and dark** are both first-class; the theme is a cookie resolved during server render, so
+  there is no flash and the toggle works with JavaScript off.
+- **Works without JavaScript** — every screen renders on the server and every write is a form:
+  the add controls fall back to the ledger's entry bar, a row to its own edit page
+  (`/ledger/:id`), the month picker is a native popover of links.
+- **Phones** get a five-slot tab bar (Home, Ledger, add, Budget, Year), an app bar with the way
+  into settings, two-line transaction rows and bottom sheets.
+
+Every text and boundary colour is contrast-verified in both themes against every surface it can
+sit on, and the chart palette is validated for colour-vision deficiency. The full spec — palette,
+type scale, components, charts, keyboard and responsive rules — is [DESIGN.md](DESIGN.md).
 
 ## Getting started
 
-Requires Node ≥ 22.13.
+Requires Node 22.13+ or 24+ (LTS lines). Odd-numbered releases such as Node 23 are refused by
+the toolchain's `engines` ranges, which `.npmrc`'s `engine-strict` enforces at install.
 
 ```sh
 npm install

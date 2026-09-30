@@ -1,16 +1,17 @@
-import { isRedirect } from '@sveltejs/kit';
+import { isHttpError, isRedirect } from '@sveltejs/kit';
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { dayBoundIn, daysInMonth, MONTH_NAMES, prevMonth, todayISO } from '$lib/dates';
 import { activeFor, createPeriod } from '$lib/server/budgets';
 import { createCategory, getCategory, listCategories } from '$lib/server/categories';
 import { createGoal, ensureLocation } from '$lib/server/goals';
-import { createTransaction, listTransactions } from '$lib/server/ledger';
+import { createTransaction, getTransaction, listTransactions } from '$lib/server/ledger';
 import { createPromotion, rebuildProjectedPeriods } from '$lib/server/promotions';
 import { createLending } from '$lib/server/registry';
 import { testDb } from '$lib/server/test-db';
 import * as home from './+page.server';
 import * as ledger from './ledger/+page.server';
+import * as edit from './ledger/[id]/+page.server';
 import * as monthly from './monthly/+page.server';
 import * as budget from './settings/budget/+page.server';
 import * as categories from './settings/categories/+page.server';
@@ -129,6 +130,96 @@ describe('ledger page', () => {
 	});
 });
 
+describe('transaction edit page', () => {
+	function seedRow(): { id: number; grocery: number; eatingOut: number } {
+		const grocery = createCategory(db, { scope: 'needs', name: 'Grocery' });
+		const eatingOut = createCategory(db, { scope: 'wants', name: 'Eating out' });
+		const id = createTransaction(db, {
+			date: '2026-07-01',
+			amountPaise: 100,
+			direction: 'outflow',
+			bucket: 'needs',
+			categoryId: grocery
+		});
+		return { id, grocery, eatingOut };
+	}
+
+	function editEvent(id: number, url: string, form?: Record<string, string>): any {
+		return { ...event(url, form), params: { id: String(id) } };
+	}
+
+	it('loads the row, its categories and the month to return to', () => {
+		const { id } = seedRow();
+		const data = edit.load(editEvent(id, `/ledger/${id}`)) as any;
+		expect(data.txn).toMatchObject({ id, amountPaise: 100, categoryName: 'Grocery' });
+		expect(data.back).toBe('/ledger?year=2026&month=7');
+		expect(data.entry.categories).toHaveLength(2);
+
+		const scoped = edit.load(editEvent(id, `/ledger/${id}?year=2026&month=8&bucket=needs`)) as any;
+		expect(scoped.back).toBe('/ledger?year=2026&month=8&bucket=needs');
+	});
+
+	it('is a 404 for a row that does not exist', () => {
+		expect.assertions(1);
+		try {
+			edit.load(editEvent(999, '/ledger/999'));
+		} catch (e) {
+			expect(isHttpError(e) && e.status === 404).toBe(true);
+		}
+	});
+
+	it('update action edits the row and redirects to the ledger month', async () => {
+		const { id, eatingOut } = seedRow();
+		await expect(
+			edit.actions.update(
+				editEvent(id, `/ledger/${id}?/update&year=2026&month=7`, {
+					id: String(id),
+					date: '2026-07-02',
+					amount: '450',
+					direction: 'outflow',
+					bucket: 'wants',
+					category: String(eatingOut),
+					note: 'lunch'
+				})
+			)
+		).rejects.toSatisfy(
+			(e: unknown) => isRedirect(e) && e.location === '/ledger?year=2026&month=7'
+		);
+
+		expect(getTransaction(db, id)).toMatchObject({
+			amountPaise: 45000,
+			categoryName: 'Eating out',
+			note: 'lunch'
+		});
+	});
+
+	it('update action fails with the entered values and leaves the row alone', async () => {
+		const { id, grocery } = seedRow();
+		const result = (await edit.actions.update(
+			editEvent(id, `/ledger/${id}?/update`, {
+				id: String(id),
+				date: '2026-07-01',
+				amount: 'abc',
+				direction: 'outflow',
+				bucket: 'needs',
+				category: String(grocery)
+			})
+		)) as any;
+		expect(result.status).toBe(400);
+		expect(result.data.error).toMatch(/amount/i);
+		expect(result.data.values.amount).toBe('abc');
+		expect(getTransaction(db, id)?.amountPaise).toBe(100);
+	});
+
+	it('delete action removes the row and returns to its month', async () => {
+		const { id } = seedRow();
+		await expect(edit.actions.delete(editEvent(id, `/ledger/${id}?/delete`, {}))).rejects.toSatisfy(
+			(e: unknown) => isRedirect(e) && e.location === '/ledger?year=2026&month=7'
+		);
+		expect(getTransaction(db, id)).toBeNull();
+	});
+});
+
 describe('monthly page', () => {
 	it('computes allocation vs actual with remaining', () => {
 		seedJuly();
@@ -206,6 +297,18 @@ describe('monthly page', () => {
 		seedJuly();
 		const data = monthly.load(event('/monthly?year=2026&month=7')) as any;
 		expect(data.awaitingIncome).toBe(false);
+	});
+
+	it('carries the month day by day, by category, and the six months to it', () => {
+		seedJuly();
+		const data = monthly.load(event('/monthly?year=2026&month=7')) as any;
+		expect(data.daily.map((d: any) => d.day)).toEqual([1, 5]);
+		expect(data.spendByCategory).toEqual([
+			expect.objectContaining({ bucket: 'needs', total: 3061300, categoryId: null })
+		]);
+		expect(data.trend).toEqual([
+			{ year: 2026, month: 7, income: 10000000, needs: 3061300, wants: 0, invest: 0 }
+		]);
 	});
 });
 

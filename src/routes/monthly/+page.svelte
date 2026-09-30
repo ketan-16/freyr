@@ -1,172 +1,180 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import Bullet from '$lib/components/Bullet.svelte';
+	import DailyChart from '$lib/components/DailyChart.svelte';
 	import Delta from '$lib/components/Delta.svelte';
-	import Icon from '$lib/components/Icon.svelte';
-	import Meter from '$lib/components/Meter.svelte';
+	import Kpi from '$lib/components/Kpi.svelte';
+	import MonthNav from '$lib/components/MonthNav.svelte';
 	import Money from '$lib/components/Money.svelte';
-	import { monthLabel, nextMonth, prevMonth } from '$lib/dates';
-	import { formatBP } from '$lib/money';
+	import Notice from '$lib/components/Notice.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import Ranks from '$lib/components/Ranks.svelte';
+	import Sparkline from '$lib/components/Sparkline.svelte';
+	import { addMonths, daysInMonth, monthLabel, shortMonth } from '$lib/dates';
+	import { share } from '$lib/format';
+	import { formatBP, formatMoney } from '$lib/money';
 	import { meter } from '$lib/progress';
 
 	let { data } = $props();
 
 	const s = $derived(data.summary);
-	const prev = $derived(prevMonth(s.year, s.month));
-	const next = $derived(nextMonth(s.year, s.month));
 	const spent = $derived(s.rows.reduce((t, r) => t + r.actual, 0));
-	// One source for the tile and the table beneath it, exactly as home folds it:
-	// income − spent is a second derivation, and the two disagree by a paisa the
-	// moment `mulBP`'s rounding does not sum the shares back to income.
+	const allocated = $derived(s.rows.reduce((t, r) => t + (r.allocated ?? 0), 0));
+	// One source for the tile and the cards beneath it, exactly as home folds it.
 	const left = $derived(s.rows.reduce((t, r) => t + (r.remaining ?? 0), 0));
-	const prevHref = $derived(`/monthly?year=${prev.year}&month=${prev.month}`);
-	const nextHref = $derived(`/monthly?year=${next.year}&month=${next.month}`);
-	/**
-	 * Whether there is anything for the tile to be "left" of: a period to
-	 * allocate by, and income for it to allocate. Missing either, every row's
-	 * remaining is null or 0 − actual and the fold is a figure nobody planned —
-	 * so the tile says nothing, the way the rows below it already do. Home gates
-	 * its headline on the same two facts.
-	 */
-	const hasAllocationBasis = $derived(s.period != null && !data.awaitingIncome);
+	/** Something to be "left" of: a period in force, and income for it to allocate. */
+	const hasBasis = $derived(s.period != null && !data.awaitingIncome);
+	const days = $derived(daysInMonth(s.year, s.month));
+	const day = $derived(data.isCurrentMonth ? Number(data.today.slice(8, 10)) : null);
+	/** How far through the month: the pace mark on every bullet. */
+	const elapsed = $derived(day == null ? null : day / days);
 
-	/**
-	 * Arrow-key stepping, scoped to the group (DESIGN.md § month-stepper). It
-	 * catches keydown bubbling from whichever arrow has focus; `keepFocus` keeps
-	 * that focus across the navigation, so repeated presses keep stepping. A
-	 * window listener would instead hijack every arrow press on the page —
-	 * horizontal scroll at 200% zoom, the table's own scroller, the rail.
-	 */
-	function onkeydown(e: KeyboardEvent) {
-		if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-		if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-		e.preventDefault();
-		goto(e.key === 'ArrowLeft' ? prevHref : nextHref, { keepFocus: true });
-	}
+	/** Six months ending at this one, zero-filled, per bucket. */
+	const trend = $derived.by(() => {
+		const by = new Map(data.trend.map((t) => [`${t.year}-${t.month}`, t]));
+		return Array.from({ length: 6 }, (_, i) => {
+			const at = addMonths(s.year, s.month, i - 5);
+			const t = by.get(`${at.year}-${at.month}`);
+			return {
+				label: shortMonth(at.year, at.month),
+				needs: t?.needs ?? 0,
+				wants: t?.wants ?? 0,
+				investments: t?.invest ?? 0
+			};
+		});
+	});
+
+	const link = (year: number, month: number) => `/monthly?year=${year}&month=${month}`;
 </script>
 
 <svelte:head>
-	<title>Monthly — Freyr</title>
+	<title>Budget · {monthLabel(s.year, s.month)} — Freyr</title>
 </svelte:head>
 
-<div class="page-head">
-	<h1>Monthly budget</h1>
-	<!--
-	  The stepper is this screen's control, so it takes the head's action slot —
-	  the corner every screen keeps its controls in.
-	-->
-	<div class="actions">
-		<!-- The keys are pressed on the focused arrow link, which is interactive; the
-		     group only listens as they bubble, so there is nothing here to focus. -->
-		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-		<div class="stepper" role="group" aria-label="Month" {onkeydown}>
-			<a href={prevHref} aria-label="Previous month, {monthLabel(prev.year, prev.month)}">
-				<Icon name="left" />
-			</a>
-			<span class="current">{monthLabel(s.year, s.month)}</span>
-			<a href={nextHref} aria-label="Next month, {monthLabel(next.year, next.month)}">
-				<Icon name="right" />
-			</a>
+<PageHeader title="Budget" sub="Allocated against spent">
+	<MonthNav year={s.year} month={s.month} today={data.today} href={link} />
+</PageHeader>
+
+<div class="page">
+	{#if !s.period}
+		<Notice tone="warn">
+			No budget period covers this month yet — set one in <a href="/settings/budget">Splits</a>.
+		</Notice>
+	{:else if data.awaitingIncome}
+		<Notice>
+			No income is booked for {monthLabel(s.year, s.month)}, so there is nothing to allocate.
+			Buckets show what was spent; targets appear once income lands.
+		</Notice>
+	{/if}
+
+	<div class="kpis">
+		<Kpi label="Income">
+			<Money value={s.income} direction="income" />
+			{#snippet foot()}
+				<Delta current={s.income} previous={data.prior.income} label="vs {data.prior.label}" />
+			{/snippet}
+		</Kpi>
+		<Kpi label="Allocated">
+			{#if hasBasis}<Money value={allocated} />{:else}<span class="faint">—</span>{/if}
+			{#snippet foot()}
+				{#if s.period}
+					<span
+						>{formatBP(s.period.needsBP)} · {formatBP(s.period.wantsBP)} · {formatBP(
+							s.period.investBP
+						)}</span
+					>
+				{:else}<span>No split in force</span>{/if}
+			{/snippet}
+		</Kpi>
+		<Kpi label="Spent">
+			<Money value={spent} />
+			{#snippet foot()}
+				<Delta
+					current={spent}
+					previous={data.prior.spent}
+					lowerIsBetter
+					label="vs {data.prior.label}{data.isCurrentMonth ? ', same days' : ''}"
+				/>
+			{/snippet}
+		</Kpi>
+		<!--
+		  With no period or no income there is nothing to be left of — every card's
+		  remainder is a dash, and so is this.
+		-->
+		<Kpi label="Left">
+			{#if hasBasis}
+				<span class:neg={left < 0}>{formatMoney(left)}</span>
+			{:else}<span class="faint">—</span>{/if}
+			{#snippet foot()}
+				{#if hasBasis}<span>{share(spent, allocated)} of the allocation used</span>{/if}
+			{/snippet}
+		</Kpi>
+	</div>
+
+	<section class="bucket-cols" aria-label="By bucket">
+		{#each s.rows as row (row.bucket)}
+			{@const m = hasBasis ? meter(row.actual, row.allocated) : null}
+			<article class="panel bcard {row.bucket}" aria-labelledby="b-{row.bucket}">
+				<div class="bcard-h">
+					<h2 id="b-{row.bucket}"><i class="sw"></i>{row.label}</h2>
+					<Sparkline
+						values={trend.map((t) => t[row.bucket])}
+						label="{row.label}, six months to {monthLabel(s.year, s.month)}"
+					/>
+				</div>
+				<div class="bcard-fig">
+					<span class="big"><Money value={row.actual} /></span>
+					<span class="of">
+						{#if hasBasis && row.allocated != null}of {formatMoney(row.allocated)}{:else}spent{/if}
+					</span>
+				</div>
+				<Bullet
+					actual={row.actual}
+					allocated={hasBasis ? row.allocated : null}
+					mark={elapsed}
+					size="tall"
+					label={m ? `${row.label}: ${m.pct}% of its allocation used` : undefined}
+				/>
+				<div class="bcard-row">
+					<span>
+						{#if m}{m.pct}% used{:else}—{/if}
+						{#if row.bp != null}· {formatBP(row.bp)} share{/if}
+					</span>
+					<span>
+						{#if hasBasis && row.remaining != null}
+							{row.remaining < 0 ? 'Over' : 'Left'}
+							<b class:neg={row.remaining < 0}>{formatMoney(Math.abs(row.remaining))}</b>
+						{:else}Left <b class="faint">—</b>{/if}
+					</span>
+				</div>
+				<p class="subhead">Categories</p>
+				<Ranks
+					rows={data.spendByCategory.filter((c) => c.bucket === row.bucket)}
+					limit={5}
+					caption="{row.label} by category"
+					empty="Nothing in {row.label.toLowerCase()} yet."
+				/>
+			</article>
+		{/each}
+	</section>
+
+	<section class="panel" aria-labelledby="daily-h">
+		<div class="panel-h">
+			<h2 id="daily-h">Day by day</h2>
+			<div class="legend" style:margin-left="auto">
+				<span><i style:--c="var(--needs)"></i>Needs</span>
+				<span><i style:--c="var(--wants)"></i>Wants</span>
+				<span><i style:--c="var(--invest)"></i>Investments</span>
+			</div>
 		</div>
-	</div>
-</div>
-
-<div class="kpis">
-	<div class="kpi">
-		<div class="label">Income</div>
-		<!-- Green only ever arrives with a sign: the money-cell convention carries
-		     the `+`, so the tile reads the same way as the rows beneath it. -->
-		<div class="value"><Money value={s.income} direction="income" /></div>
-		<Delta current={s.income} previous={data.prior.income} label="vs {data.prior.label}" />
-	</div>
-	<div class="kpi">
-		<div class="label">Spent</div>
-		<div class="value"><Money value={spent} /></div>
-		<Delta
-			current={spent}
-			previous={data.prior.spent}
-			lowerIsBetter
-			label="vs {data.prior.label}"
-		/>
-	</div>
-	<!--
-	  With no period covering the month, or no income booked, there is nothing to
-	  be left of — every row's Allocated and Remaining is a dash, and so is this.
-	  A figure here above a table of dashes was the contradiction being fixed.
-	-->
-	<div class="kpi">
-		<div class="label">Left</div>
-		<div class="value {hasAllocationBasis && left < 0 ? 'neg' : ''}">
-			{#if hasAllocationBasis}<Money value={left} />{:else}<span class="faint">—</span>{/if}
+		<div class="panel-b">
+			<DailyChart
+				daily={data.daily}
+				year={s.year}
+				month={s.month}
+				{days}
+				today={day}
+				href={(d) => `/ledger?year=${s.year}&month=${s.month}#day-${d}`}
+			/>
 		</div>
-	</div>
+	</section>
 </div>
-
-{#if !s.period}
-	<p class="notice">
-		No budget period covers this month yet — set one in
-		<a href="/settings/budget">Budget settings</a>.
-	</p>
-{:else if data.awaitingIncome}
-	<p class="notice">
-		No income is booked for {monthLabel(s.year, s.month)}, so there is nothing to allocate. Buckets
-		show what was spent; targets appear once income lands.
-	</p>
-{/if}
-
-<section class="panel">
-	<div class="panel-head"><h2>By bucket</h2></div>
-	<div class="table-wrap">
-		<table>
-			<thead>
-				<tr>
-					<!-- No `.grow` in this table: six columns of figures, none of which
-					     deserves the leftover width, so they share it. -->
-					<th scope="col">Bucket</th>
-					<th scope="col">Used</th>
-					<th scope="col" class="num">Share</th>
-					<th scope="col" class="num">Allocated</th>
-					<th scope="col" class="num">Actual</th>
-					<th scope="col" class="num">Remaining</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each s.rows as row (row.bucket)}
-					{@const m = meter(row.actual, row.allocated)}
-					<tr>
-						<td data-label="Bucket">{row.label}</td>
-						<td data-label="Used">
-							<span class="meter-cell">
-								<Meter value={m} />
-								<span class="pct">{m ? `${m.pct}%` : ''}</span>
-							</span>
-						</td>
-						<td data-label="Share" class="num muted">{row.bp == null ? '—' : formatBP(row.bp)}</td>
-						<td data-label="Allocated" class="num amount">
-							<Money value={row.allocated ?? 0} />
-						</td>
-						<td data-label="Actual" class="num amount"><Money value={row.actual} /></td>
-						<!--
-					  Before income lands there is no allocation to have anything left
-					  of, so remaining is not "0 − actual" overspend — it is nothing
-					  yet, exactly as home renders it.
-					-->
-						<td
-							data-label="Remaining"
-							class="num amount {data.awaitingIncome || row.remaining == null
-								? ''
-								: row.remaining < 0
-									? 'neg'
-									: ''}"
-						>
-							{#if data.awaitingIncome}
-								<span class="faint">—</span>
-							{:else}
-								<Money value={row.remaining ?? 0} />
-							{/if}
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
-</section>

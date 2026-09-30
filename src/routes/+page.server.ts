@@ -1,7 +1,8 @@
-import { daysInMonth, todayISO } from '$lib/dates';
+import { addMonths, daysInMonth, prevMonth, todayISO } from '$lib/dates';
 import { monthSummary } from '$lib/server/budgets';
 import { priorMonth } from '$lib/server/comparison';
 import { goalProgress } from '$lib/server/goals';
+import { dailyTotals, monthlyTotals, monthRange, outflowByCategory } from '$lib/server/insights';
 import { listTransactions } from '$lib/server/ledger';
 import { openLendingsTotal } from '$lib/server/registry';
 import { createTxnAction, entryOptions } from '$lib/server/txn-form';
@@ -9,6 +10,9 @@ import type { Actions, PageServerLoad } from './$types';
 
 /** How many rows the recent-activity list shows. Bounded so the query stays constant-cost. */
 const RECENT = 8;
+
+/** How many months the headline sparklines cover, this one included. */
+const TREND_MONTHS = 6;
 
 export const load: PageServerLoad = ({ locals }) => {
 	const today = todayISO();
@@ -18,6 +22,8 @@ export const load: PageServerLoad = ({ locals }) => {
 
 	const summary = monthSummary(locals.db, year, month);
 	const spent = summary.rows.reduce((total, row) => total + row.actual, 0);
+	const prev = prevMonth(year, month);
+	const trendFrom = addMonths(year, month, -(TREND_MONTHS - 1));
 
 	return {
 		summary,
@@ -35,7 +41,18 @@ export const load: PageServerLoad = ({ locals }) => {
 		goals: goalProgress(locals.db),
 		lendingsOutstanding: openLendingsTotal(locals.db),
 		recent: listTransactions(locals.db, { limit: RECENT }),
-		entry: entryOptions(locals.db, today)
+		entry: entryOptions(locals.db, today),
+		// Chart data: each is one grouped query over this month, the one before
+		// or the last six, so the page costs months of rows, never the ledger.
+		daily: dailyTotals(locals.db, year, month),
+		priorDaily: dailyTotals(locals.db, prev.year, prev.month),
+		priorDaysInMonth: daysInMonth(prev.year, prev.month),
+		spendByCategory: outflowByCategory(locals.db, ...monthRange(year, month)),
+		trend: monthlyTotals(
+			locals.db,
+			monthRange(trendFrom.year, trendFrom.month)[0],
+			monthRange(year, month)[1]
+		)
 	};
 };
 

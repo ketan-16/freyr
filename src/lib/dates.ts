@@ -49,6 +49,43 @@ export function shortDate(date: string, contextYear?: number): string {
 	return year === contextYear ? label : `${label} ${String(year).slice(2)}`;
 }
 
+export const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * Day of the week, 0 = Sunday, for a year/month/day. Built from local
+ * components, so no timezone can move it to the neighbouring day.
+ */
+export function weekday(year: number, month: number, day: number): number {
+	return new Date(year, month - 1, day).getDay();
+}
+
+/**
+ * A day heading for a statement: `Tue 30 Sep`, with a two-digit year when the
+ * date falls outside `contextYear` (the same rule as `shortDate`).
+ */
+export function dayLabel(date: string, contextYear?: number): string {
+	if (!DATE_RE.test(date)) return date;
+	const y = Number(date.slice(0, 4));
+	const m = Number(date.slice(5, 7));
+	const d = Number(date.slice(8, 10));
+	return `${WEEKDAYS[weekday(y, m, d)]} ${shortDate(date, contextYear)}`;
+}
+
+/** A month label short enough for an axis or a stepper on a phone: `Sep 26`. */
+export function shortMonth(year: number, month: number): string {
+	return `${MONTH_NAMES[month - 1].slice(0, 3)} ${String(year).slice(2)}`;
+}
+
+/** The month `delta` months away from (year, month); negative steps back. */
+export function addMonths(
+	year: number,
+	month: number,
+	delta: number
+): { year: number; month: number } {
+	const index = year * 12 + (month - 1) + delta;
+	return { year: Math.floor(index / 12), month: (index % 12) + 1 };
+}
+
 export function prevMonth(year: number, month: number): { year: number; month: number } {
 	return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
 }

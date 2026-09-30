@@ -92,6 +92,57 @@ export function deleteTransaction(db: DatabaseSync, id: number): void {
 	db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
 }
 
+/**
+ * The fields the entry form owns. Goal, location, lending and the imported flag
+ * are not among them: an edit leaves them as stored, so a contribution stays on
+ * its goal and a repayment on its lending.
+ */
+export type TxnEdit = Pick<
+	TxnInput,
+	'date' | 'amountPaise' | 'direction' | 'bucket' | 'incomeSource' | 'note' | 'categoryId'
+>;
+
+/**
+ * Rewrites one transaction's form-owned fields, under the same validation as a
+ * new row. A row linked to a goal must stay an outflow, and one linked to a
+ * lending must stay income from the same source: goal progress sums
+ * contributions and the lending total subtracts repayments, and neither can
+ * tell which way a row flows or whether the rollups also count it.
+ */
+export function updateTransaction(db: DatabaseSync, id: number, t: TxnEdit): void {
+	validate(t);
+	const current = db
+		.prepare('SELECT goal_id, lending_id, income_source FROM transactions WHERE id = ?')
+		.get(id) as
+		{ goal_id: number | null; lending_id: number | null; income_source: Source | null } | undefined;
+	if (!current) throw new Error('That transaction no longer exists.');
+	if (current.goal_id != null && t.direction !== 'outflow')
+		throw new Error('A goal contribution has to stay an outflow.');
+	// Its source too: turned into job income, a repayment would start counting
+	// toward every allocation while still paying the lending down.
+	if (
+		current.lending_id != null &&
+		(t.direction !== 'income' || t.incomeSource !== current.income_source)
+	)
+		throw new Error('A lending repayment keeps its direction and source.');
+
+	db.prepare(
+		`UPDATE transactions
+		 SET date = ?, amount_paise = ?, direction = ?, bucket = ?, income_source = ?,
+		     note = ?, category_id = ?
+		 WHERE id = ?`
+	).run(
+		t.date,
+		t.amountPaise,
+		t.direction,
+		t.bucket ?? null,
+		t.incomeSource ?? null,
+		t.note ?? null,
+		t.categoryId ?? null,
+		id
+	);
+}
+
 export interface TxnFilter {
 	year?: number;
 	month?: number;
@@ -108,6 +159,30 @@ function dateRange(year: number, month?: number): [string, string] {
 	return [`${year}-${mm(month)}-01`, next];
 }
 
+const SELECT_TXN = `SELECT t.id, t.date, t.amount_paise, t.direction, t.bucket, t.income_source,
+        t.note, t.imported, t.category_id, t.goal_id, t.location_id, t.lending_id,
+        c.name AS category_name
+ FROM transactions t
+ LEFT JOIN categories c ON c.id = t.category_id`;
+
+function mapTxn(r: Record<string, unknown>): Txn {
+	return {
+		id: r.id as number,
+		date: r.date as string,
+		amountPaise: r.amount_paise as number,
+		direction: r.direction as Direction,
+		bucket: r.bucket as Bucket | null,
+		incomeSource: r.income_source as Source | null,
+		note: r.note as string | null,
+		imported: r.imported === 1,
+		categoryId: r.category_id as number | null,
+		goalId: r.goal_id as number | null,
+		locationId: r.location_id as number | null,
+		lendingId: r.lending_id as number | null,
+		categoryName: r.category_name as string | null
+	};
+}
+
 export function listTransactions(db: DatabaseSync, f: TxnFilter): Txn[] {
 	const where: string[] = [];
 	const params: (string | number)[] = [];
@@ -122,32 +197,21 @@ export function listTransactions(db: DatabaseSync, f: TxnFilter): Txn[] {
 	}
 	const rows = db
 		.prepare(
-			`SELECT t.id, t.date, t.amount_paise, t.direction, t.bucket, t.income_source,
-			        t.note, t.imported, t.category_id, t.goal_id, t.location_id, t.lending_id,
-			        c.name AS category_name
-			 FROM transactions t
-			 LEFT JOIN categories c ON c.id = t.category_id
+			`${SELECT_TXN}
 			 ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
 			 ORDER BY t.date DESC, t.id DESC
 			 ${f.limit ? 'LIMIT ?' : ''}`
 		)
 		.all(...params, ...(f.limit ? [f.limit] : [])) as Record<string, unknown>[];
 
-	return rows.map((r) => ({
-		id: r.id as number,
-		date: r.date as string,
-		amountPaise: r.amount_paise as number,
-		direction: r.direction as Direction,
-		bucket: r.bucket as Bucket | null,
-		incomeSource: r.income_source as Source | null,
-		note: r.note as string | null,
-		imported: r.imported === 1,
-		categoryId: r.category_id as number | null,
-		goalId: r.goal_id as number | null,
-		locationId: r.location_id as number | null,
-		lendingId: r.lending_id as number | null,
-		categoryName: r.category_name as string | null
-	}));
+	return rows.map(mapTxn);
+}
+
+/** One transaction by id — the edit page's read. */
+export function getTransaction(db: DatabaseSync, id: number): Txn | null {
+	const row = db.prepare(`${SELECT_TXN} WHERE t.id = ?`).get(id) as
+		Record<string, unknown> | undefined;
+	return row ? mapTxn(row) : null;
 }
 
 // ---- Rollups (computed, never stored) ----

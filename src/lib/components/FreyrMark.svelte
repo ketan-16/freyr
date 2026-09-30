@@ -1,11 +1,11 @@
 <!--
-  Freyr � the mark. Silhouette traced from the original artwork in logo.png:
-  de-speckled, contours relaxed, stroke weight unified. The flame is redrawn �
+  Freyr — the mark. Silhouette traced from the original artwork in logo.png:
+  de-speckled, contours relaxed, stroke weight unified. The flame is redrawn —
   the raster flame traces to a lobed blob with no tip at any threshold, and it
-  has to stay legible at 24px. See DESIGN.md � Brand & Logo.
+  has to stay legible at 24px. See DESIGN.md § Brand & logo.
 
   Two colours only. The silhouette follows `currentColor`, so one asset serves
-  paper, the evergreen rail and dark canvas; the flame is the brand's one fixed
+  paper, the sidebar and dark canvas; the flame is the brand's one fixed
   colour and never changes.
 -->
 <script lang="ts">

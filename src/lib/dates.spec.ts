@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { monthStart, daysInMonth, dayBoundIn, shortDate } from './dates';
+import {
+	addMonths,
+	dayBoundIn,
+	dayLabel,
+	daysInMonth,
+	monthStart,
+	shortDate,
+	shortMonth,
+	weekday
+} from './dates';
 
 describe('shortDate', () => {
 	it('drops the year inside the year the screen is scoped to', () => {
@@ -67,5 +76,39 @@ describe('dayBoundIn', () => {
 	it('clamps a day the target month does not have', () => {
 		expect(dayBoundIn(2026, 2, 31)).toBe('2026-03-01');
 		expect(dayBoundIn(2024, 2, 30)).toBe('2024-03-01');
+	});
+});
+
+describe('weekday', () => {
+	it('names the day of the week from local components', () => {
+		expect(weekday(2026, 9, 30)).toBe(3); // a Wednesday
+		expect(weekday(2026, 1, 1)).toBe(4); // a Thursday
+	});
+});
+
+describe('dayLabel', () => {
+	it('prefixes the weekday to the short date', () => {
+		expect(dayLabel('2026-09-30', 2026)).toBe('Wed 30 Sep');
+		expect(dayLabel('2025-12-31', 2026)).toBe('Wed 31 Dec 25');
+	});
+
+	it('returns anything that is not an ISO date unchanged', () => {
+		expect(dayLabel('soon')).toBe('soon');
+	});
+});
+
+describe('shortMonth', () => {
+	it('abbreviates the month and the year', () => {
+		expect(shortMonth(2026, 9)).toBe('Sep 26');
+	});
+});
+
+describe('addMonths', () => {
+	it('steps across year boundaries both ways', () => {
+		expect(addMonths(2026, 1, -1)).toEqual({ year: 2025, month: 12 });
+		expect(addMonths(2026, 12, 1)).toEqual({ year: 2027, month: 1 });
+		expect(addMonths(2026, 9, -5)).toEqual({ year: 2026, month: 4 });
+		expect(addMonths(2026, 3, -15)).toEqual({ year: 2024, month: 12 });
+		expect(addMonths(2026, 3, 0)).toEqual({ year: 2026, month: 3 });
 	});
 });

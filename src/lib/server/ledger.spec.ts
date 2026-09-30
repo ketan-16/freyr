@@ -2,14 +2,17 @@ import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fromRupees, type Paise } from '$lib/money';
 import { createCategory } from './categories';
-import { createGoal, ensureLocation } from './goals';
+import { createGoal, ensureLocation, goalProgress } from './goals';
+import { createLending, openLendingsTotal } from './registry';
 import {
 	createTransaction,
 	deleteTransaction,
+	getTransaction,
 	listTransactions,
 	monthlyActuals,
 	monthlyActualsForYear,
 	monthsWithData,
+	updateTransaction,
 	years,
 	yearlySummary,
 	type Bucket,
@@ -305,5 +308,132 @@ describe('monthlyActualsForYear', () => {
 			if (row) expect({ ...row, month: undefined }).toEqual({ ...one, month: undefined });
 			else expect(one).toEqual({ income: 0, needs: 0, wants: 0, invest: 0 });
 		}
+	});
+});
+
+describe('updateTransaction', () => {
+	const base = { date: '2026-07-02', amountPaise: 50000, direction: 'outflow' as const };
+
+	it('rewrites the form-owned fields in place', () => {
+		const grocery = createCategory(db, { scope: 'needs', name: 'Grocery' });
+		const salary = createCategory(db, { scope: 'job', name: 'Salary' });
+		const id = createTransaction(db, {
+			...base,
+			bucket: 'needs',
+			categoryId: grocery,
+			note: 'veg'
+		});
+
+		updateTransaction(db, id, {
+			date: '2026-07-03',
+			amountPaise: 9000000,
+			direction: 'income',
+			incomeSource: 'job',
+			categoryId: salary,
+			note: null
+		});
+
+		const [txn] = listTransactions(db, {});
+		expect(txn).toMatchObject({
+			id,
+			date: '2026-07-03',
+			amountPaise: 9000000,
+			direction: 'income',
+			bucket: null,
+			incomeSource: 'job',
+			categoryName: 'Salary',
+			note: null
+		});
+	});
+
+	it('validates exactly as a new row does', () => {
+		const id = createTransaction(db, { ...base, bucket: 'needs' });
+		expect(() => updateTransaction(db, id, { ...base, amountPaise: 0, bucket: 'needs' })).toThrow(
+			/positive/
+		);
+		expect(() => updateTransaction(db, id, { ...base })).toThrow(/bucket/);
+		expect(listTransactions(db, {})[0].amountPaise).toBe(50000);
+	});
+
+	it('reports a row that no longer exists', () => {
+		expect(() => updateTransaction(db, 999, { ...base, bucket: 'needs' })).toThrow(
+			/no longer exists/
+		);
+	});
+
+	// An edit owns the form's fields only: the imported flag and the goal and
+	// location a contribution was booked against survive it.
+	it('keeps the links the form does not own', () => {
+		const goalId = createGoal(db, { name: 'Car', kind: 'goal', targetPaise: 1000000 });
+		const locationId = ensureLocation(db, 'Bank');
+		const id = createTransaction(db, {
+			...base,
+			bucket: 'investments',
+			goalId,
+			locationId,
+			imported: true
+		});
+
+		updateTransaction(db, id, { ...base, amountPaise: 70000, bucket: 'investments' });
+
+		const [txn] = listTransactions(db, {});
+		expect(txn).toMatchObject({ goalId, locationId, imported: true, amountPaise: 70000 });
+		expect(goalProgress(db)[0].contributed).toBe(70000);
+	});
+
+	it('keeps a goal contribution an outflow and a repayment income', () => {
+		const goalId = createGoal(db, { name: 'Car', kind: 'goal', targetPaise: 1000000 });
+		const locationId = ensureLocation(db, 'Bank');
+		const contribution = createTransaction(db, {
+			...base,
+			bucket: 'investments',
+			goalId,
+			locationId
+		});
+		expect(() =>
+			updateTransaction(db, contribution, {
+				...base,
+				direction: 'income',
+				incomeSource: 'job'
+			})
+		).toThrow(/goal contribution/);
+
+		const lendingId = createLending(db, { person: 'Rahul', principalPaise: 100000 });
+		const repayment = createTransaction(db, {
+			date: '2026-07-05',
+			amountPaise: 40000,
+			direction: 'income',
+			incomeSource: 'other',
+			lendingId
+		});
+		expect(() => updateTransaction(db, repayment, { ...base, bucket: 'needs' })).toThrow(
+			/lending repayment/
+		);
+		// Nor may it become job income, which every rollup would then count.
+		expect(() =>
+			updateTransaction(db, repayment, {
+				date: '2026-07-05',
+				amountPaise: 40000,
+				direction: 'income',
+				incomeSource: 'job'
+			})
+		).toThrow(/lending repayment/);
+		expect(openLendingsTotal(db)).toBe(60000);
+	});
+});
+
+describe('getTransaction', () => {
+	it('reads one row with its category name, or null', () => {
+		const grocery = createCategory(db, { scope: 'needs', name: 'Grocery' });
+		const id = createTransaction(db, {
+			date: '2026-07-02',
+			amountPaise: 50000,
+			direction: 'outflow',
+			bucket: 'needs',
+			categoryId: grocery
+		});
+		expect(getTransaction(db, id)).toEqual(listTransactions(db, {})[0]);
+		expect(getTransaction(db, id)?.categoryName).toBe('Grocery');
+		expect(getTransaction(db, id + 1)).toBeNull();
 	});
 });

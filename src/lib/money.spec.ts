@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { formatBP, formatMoney, fromRupees, mulBP, parseMoney, parsePercentBP } from './money';
+import {
+	formatBP,
+	formatMoney,
+	fromRupees,
+	mulBP,
+	parseMoney,
+	parsePercentBP,
+	toAmountInput
+} from './money';
 
 describe('parseMoney', () => {
 	it.each([
@@ -108,5 +116,24 @@ describe('fromRupees', () => {
 	});
 	it('rejects non-integers', () => {
 		expect(() => fromRupees(1.5)).toThrow();
+	});
+});
+
+describe('toAmountInput', () => {
+	it('prints whole rupees without decimals and paise with two', () => {
+		expect(toAmountInput(100000)).toBe('1000');
+		expect(toAmountInput(125050)).toBe('1250.50');
+		expect(toAmountInput(5)).toBe('0.05');
+	});
+
+	// The point of the function: an edit form seeds its field with this and
+	// posts it straight back through parseMoney.
+	it('round-trips through parseMoney', () => {
+		for (const p of [1, 99, 100, 125050, 1234567890]) expect(parseMoney(toAmountInput(p))).toBe(p);
+	});
+
+	it('refuses a negative or fractional amount', () => {
+		expect(() => toAmountInput(-1)).toThrow();
+		expect(() => toAmountInput(1.5)).toThrow();
 	});
 });

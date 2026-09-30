@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import Icon from '$lib/components/Icon.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import ShareBar from '$lib/components/ShareBar.svelte';
+	import SplitChart from '$lib/components/SplitChart.svelte';
 	import { shortDate } from '$lib/dates';
-	import { formatBP } from '$lib/money';
+	import { formatBP, parsePercentBP } from '$lib/money';
 
 	let { data, form } = $props();
 
@@ -12,56 +15,100 @@
 	 */
 	const failed = $derived(form?.failed);
 	const message = $derived(form?.error ?? '');
-	const typed = $derived(form?.values ?? {});
+	const typed = $derived<Record<string, string>>(form?.values ?? {});
+
+	/** The editable inverse of parsePercentBP: 2720 → "27.20". */
+	const pct = (bp: number) => formatBP(bp).replace('%', '');
+
+	const BUCKETS = [
+		['needs', 'Needs'],
+		['wants', 'Wants'],
+		['invest', 'Investments']
+	] as const;
 
 	/**
-	 * The editable inverse of `parsePercentBP`: 2720 → "27.20". `formatBP` owns
-	 * the arithmetic — it is integer division and remainder, where `bp / 100`
-	 * here was a float — and the only difference an input needs is the dropped
-	 * `%`, which `parsePercentBP` would not accept back.
+	 * The policy's six shares as the form shows them, so each split can show its
+	 * sum and proportion while it is typed: what was typed wins over what was
+	 * saved (or posted, after a failure). Field names are the form's own.
 	 */
-	const pct = (bp: number) => formatBP(bp).replace('%', '');
+	const saved = $derived({
+		base_needs: typed.base_needs ?? pct(data.policy.base.needsBP),
+		base_wants: typed.base_wants ?? pct(data.policy.base.wantsBP),
+		base_invest: typed.base_invest ?? pct(data.policy.base.investBP),
+		marg_needs: typed.marg_needs ?? pct(data.policy.marginal.needsBP),
+		marg_wants: typed.marg_wants ?? pct(data.policy.marginal.wantsBP),
+		marg_invest: typed.marg_invest ?? pct(data.policy.marginal.investBP)
+	} as Record<string, string>);
+	let edits = $state<Record<string, string>>({});
+	const shareOf = (key: string) => edits[key] ?? saved[key] ?? '';
+
+	/** A typed share in basis points, or null while it does not parse. */
+	function bp(key: string): number | null {
+		try {
+			return parsePercentBP(shareOf(key));
+		} catch {
+			return null;
+		}
+	}
+
+	function sum(prefix: string): number | null {
+		const parts = BUCKETS.map(([b]) => bp(`${prefix}_${b}`));
+		return parts.some((p) => p == null) ? null : parts.reduce((t, p) => t! + p!, 0);
+	}
+
+	const splits = [
+		{ key: 'base', label: 'Base split', hint: 'The starting salary' },
+		{ key: 'marg', label: 'Raise split', hint: 'Where each raise goes' }
+	];
+
+	const current = $derived(data.periods.find((p) => p.id === data.activeId) ?? null);
 </script>
 
 <svelte:head>
-	<title>Budget settings — Freyr</title>
+	<title>Splits — Freyr</title>
 </svelte:head>
 
-<div class="page-head">
-	<h1>Budget</h1>
-	<span class="context">Projected from the policy and the promotion log</span>
-</div>
+<PageHeader
+	title="Splits"
+	sub="How income divides across the buckets"
+	back={{ href: '/settings', label: 'Settings' }}
+/>
 
-<div class="panels">
-	<section class="panel">
-		<div class="panel-head"><h2>Raise policy</h2></div>
-		<!--
-	  The destination is stated rather than implied: every raise pulls the weights a
-	  fraction of the way from the base split to the raise split, so a career of
-	  them settles on the raise split itself. Without the sentence the asymptote is
-	  invisible until enough promotions have been logged to see it happen.
-	-->
-		<div class="panel-body">
-			<p class="prose">
-				The base split applies to the starting salary; the raise split decides where each raise
-				goes. Every raise moves the weights toward the raise split, so over a career they settle on
-				it — {formatBP(data.policy.marginal.needsBP)} needs, {formatBP(
-					data.policy.marginal.wantsBP
-				)} wants, {formatBP(data.policy.marginal.investBP)} invest.
-			</p>
+<div class="page">
+	<section class="panel" aria-labelledby="traj-h">
+		<div class="panel-h">
+			<h2 id="traj-h">Split over time</h2>
+			<div class="legend" style:margin-left="auto">
+				<span><i style:--c="var(--needs)"></i>Needs</span>
+				<span><i style:--c="var(--wants)"></i>Wants</span>
+				<span><i style:--c="var(--invest)"></i>Investments</span>
+			</div>
 		</div>
+		<div class="panel-b">
+			{#if current}
+				<p class="split-now">
+					In force now: <b>{formatBP(current.needsBP)}</b> needs ·
+					<b>{formatBP(current.wantsBP)}</b> wants · <b>{formatBP(current.investBP)}</b>
+					investments, since {shortDate(current.effectiveFrom)}. Every raise moves the weights
+					toward the raise split — {formatBP(data.policy.marginal.needsBP)} · {formatBP(
+						data.policy.marginal.wantsBP
+					)} ·
+					{formatBP(data.policy.marginal.investBP)} — so over a career they settle on it.
+				</p>
+			{/if}
+			<SplitChart periods={data.periods} promotions={data.promotions} today={data.today} />
+		</div>
+	</section>
 
-		<details class="entry-wrap" open>
-			<summary>Edit raise policy</summary>
-			<form class="entry" method="POST" action="?/savePolicy" use:enhance>
-				<div class="field">
-					<label for="p-from">Base from</label>
-					<!--
-			  The message covers the whole submission — the domain validates each
-			  triple as a triple, and the date against the promotion log — so it
-			  describes the form's first control rather than pretending one field
-			  owns it.
-			-->
+	<div class="grid">
+		<section class="panel c6" aria-labelledby="policy-h">
+			<div class="panel-h">
+				<h2 id="policy-h">Raise policy</h2>
+			</div>
+			<form class="panel-b policy" method="POST" action="?/savePolicy" use:enhance>
+				<div class="field" style:max-width="11rem">
+					<label for="p-from">Base split from</label>
+					<!-- The message covers the whole submission, so it describes the first control. -->
 					<input
 						id="p-from"
 						name="base_effective_from"
@@ -71,86 +118,60 @@
 						required
 					/>
 				</div>
-				<div class="field">
-					<label for="p-base-needs">Base needs %</label>
-					<input
-						id="p-base-needs"
-						class="money"
-						name="base_needs"
-						value={typed.base_needs ?? pct(data.policy.base.needsBP)}
-						inputmode="decimal"
-						required
-					/>
+
+				<div class="split-grid">
+					<span class="corner"></span>
+					{#each BUCKETS as [b, name] (b)}
+						<span class="col-h" aria-hidden="true"><i class="sw {b}"></i>{name}</span>
+					{/each}
+					<span class="corner"></span>
+					{#each splits as split (split.key)}
+						{@const total = sum(split.key)}
+						<span class="row-h">{split.label}<small>{split.hint}</small></span>
+						{#each BUCKETS as [b, name] (b)}
+							{@const field = `${split.key}_${b}`}
+							<span class="affix">
+								<label class="visually-hidden" for="p-{field}">{split.label}, {name} %</label>
+								<input
+									id="p-{field}"
+									class="pct"
+									name={field}
+									value={shareOf(field)}
+									oninput={(e) => (edits[field] = e.currentTarget.value)}
+									inputmode="decimal"
+									autocomplete="off"
+									required
+								/>
+								<span class="post" aria-hidden="true">%</span>
+							</span>
+						{/each}
+						<span class="sum" class:bad={total != null && total !== 10000}>
+							{#if total != null}
+								<ShareBar
+									parts={BUCKETS.map(([b]) => ({ key: b, value: bp(`${split.key}_${b}`) ?? 0 }))}
+								/>
+								{total === 10000 ? '100%' : `${formatBP(total)} — must be 100%`}
+							{/if}
+						</span>
+					{/each}
 				</div>
-				<div class="field">
-					<label for="p-base-wants">Base wants %</label>
-					<input
-						id="p-base-wants"
-						class="money"
-						name="base_wants"
-						value={typed.base_wants ?? pct(data.policy.base.wantsBP)}
-						inputmode="decimal"
-						required
-					/>
+
+				<div class="form-actions">
+					<button class="btn primary" type="submit">Save policy</button>
+					<span class="muted">Rewrites every base and promotion period below.</span>
 				</div>
-				<div class="field">
-					<label for="p-base-invest">Base invest %</label>
-					<input
-						id="p-base-invest"
-						class="money"
-						name="base_invest"
-						value={typed.base_invest ?? pct(data.policy.base.investBP)}
-						inputmode="decimal"
-						required
-					/>
-				</div>
-				<div class="field">
-					<label for="p-marg-needs">Raise needs %</label>
-					<input
-						id="p-marg-needs"
-						class="money"
-						name="marg_needs"
-						value={typed.marg_needs ?? pct(data.policy.marginal.needsBP)}
-						inputmode="decimal"
-						required
-					/>
-				</div>
-				<div class="field">
-					<label for="p-marg-wants">Raise wants %</label>
-					<input
-						id="p-marg-wants"
-						class="money"
-						name="marg_wants"
-						value={typed.marg_wants ?? pct(data.policy.marginal.wantsBP)}
-						inputmode="decimal"
-						required
-					/>
-				</div>
-				<div class="field">
-					<label for="p-marg-invest">Raise invest %</label>
-					<input
-						id="p-marg-invest"
-						class="money"
-						name="marg_invest"
-						value={typed.marg_invest ?? pct(data.policy.marginal.investBP)}
-						inputmode="decimal"
-						required
-					/>
-				</div>
-				<button class="primary" type="submit">Save policy</button>
+				{#if failed === 'savePolicy'}<p class="error" id="p-error" role="alert">{message}</p>{/if}
 			</form>
-			{#if failed === 'savePolicy'}<p class="error" id="p-error" role="alert">{message}</p>{/if}
-		</details>
-	</section>
+		</section>
 
-	<section class="panel">
-		<div class="panel-head"><h2>Promotions</h2></div>
-
-		<details class="entry-wrap" open>
-			<summary>Log a promotion</summary>
-			<form class="entry" method="POST" action="?/addPromotion" use:enhance>
-				<div class="field">
-					<label for="r-date">Effective date</label>
+		<section class="panel c6" aria-labelledby="promo-h">
+			<div class="panel-h">
+				<h2 id="promo-h">Promotions</h2>
+				<span class="meta">{data.promotions.length}</span>
+			</div>
+			<form class="panel-b form-row" method="POST" action="?/addPromotion" use:enhance>
+				<div class="field" style:width="9.5rem">
+					<label for="r-date">Effective</label>
 					<input
 						id="r-date"
 						name="effective_date"
@@ -160,174 +181,155 @@
 						required
 					/>
 				</div>
-				<div class="field">
-					<label for="r-increment">Raise %</label>
-					<input
-						id="r-increment"
-						class="money"
-						name="increment"
-						value={typed.increment ?? ''}
-						inputmode="decimal"
-						autocomplete="off"
-						required
-					/>
+				<div class="field" style:width="6rem">
+					<label for="r-increment">Raise<span class="visually-hidden"> %</span></label>
+					<span class="affix">
+						<input
+							id="r-increment"
+							class="pct"
+							name="increment"
+							value={typed.increment ?? ''}
+							inputmode="decimal"
+							autocomplete="off"
+							required
+						/>
+						<span class="post" aria-hidden="true">%</span>
+					</span>
 				</div>
 				<div class="field grow">
 					<label for="r-note">Note</label>
 					<input id="r-note" name="note" value={typed.note ?? ''} autocomplete="off" />
 				</div>
-				<button class="primary" type="submit">Log promotion</button>
+				<button class="btn primary" type="submit"><Icon name="plus" />Log</button>
 			</form>
-			{#if failed === 'addPromotion'}<p class="error" id="r-error" role="alert">{message}</p>{/if}
-		</details>
+			{#if failed === 'addPromotion'}
+				<p class="error panel-note" id="r-error" role="alert">{message}</p>
+			{/if}
+			<!-- Row deletes have no control of their own to hang a message on. -->
+			{#if failed === 'deletePromotion'}<p class="error panel-note" role="alert">{message}</p>{/if}
 
-		<!-- Row deletes have no control of their own to hang a message on. -->
-		{#if failed === 'deletePromotion'}<p class="error" role="alert">{message}</p>{/if}
-
-		<div class="table-wrap">
-			<table>
-				<thead>
-					<tr>
-						<th scope="col" class="date">Effective</th>
-						<th scope="col" class="num">Raise</th>
-						<th scope="col" class="num">Needs</th>
-						<th scope="col" class="num">Wants</th>
-						<th scope="col" class="num">Invest</th>
-						<th scope="col" class="wrap">Note</th>
-						<th scope="col"><span class="visually-hidden">Actions</span></th>
-					</tr>
-				</thead>
-				<tbody>
-					<!--
-			  Needs/Wants/Invest are the split this raise produced, every earlier
-			  raise folded in — not the raise's own share of anything.
-			-->
-					{#each data.promotions as promotion (promotion.id)}
+			<div class="tbl-scroll">
+				<table class="tbl">
+					<thead>
 						<tr>
-							<!-- A promotion log spans years, so each row carries its own. -->
-							<td data-label="Effective" class="date">{shortDate(promotion.effectiveDate)}</td>
-							<td data-label="Raise" class="num">{formatBP(promotion.incrementBP)}</td>
-							<td data-label="Needs" class="num">{formatBP(promotion.weights.needsBP)}</td>
-							<td data-label="Wants" class="num">{formatBP(promotion.weights.wantsBP)}</td>
-							<td data-label="Invest" class="num">{formatBP(promotion.weights.investBP)}</td>
-							<td data-label={promotion.note ? 'Note' : null} class="muted wrap">
-								{promotion.note ?? ''}
-							</td>
-							<td data-label="">
-								<form method="POST" action="?/deletePromotion" use:enhance>
-									<input type="hidden" name="id" value={promotion.id} />
-									<button
-										class="icon"
-										type="submit"
-										aria-label="Delete the raise effective {promotion.effectiveDate}"
-									>
-										<Icon name="trash" />
-									</button>
-								</form>
-							</td>
+							<th scope="col" class="first">Effective</th>
+							<th scope="col" class="num">Raise</th>
+							<th scope="col">Split after it</th>
+							<th scope="col" class="grow">Note</th>
+							<th scope="col" class="last"><span class="visually-hidden">Actions</span></th>
 						</tr>
-					{:else}
-						<tr><td class="empty" colspan="7">No promotions logged yet.</td></tr>
-					{/each}
-				</tbody>
-			</table>
+					</thead>
+					<tbody>
+						<!-- The split each raise produced, every earlier raise folded in. -->
+						{#each data.promotions as p (p.id)}
+							<tr>
+								<td class="first tnum">{shortDate(p.effectiveDate)}</td>
+								<td class="num">+{formatBP(p.incrementBP)}</td>
+								<td class="tnum">
+									{formatBP(p.weights.needsBP)} · {formatBP(p.weights.wantsBP)} · {formatBP(
+										p.weights.investBP
+									)}
+								</td>
+								<td class="grow note-cell muted" title={p.note ?? undefined}>{p.note ?? ''}</td>
+								<td class="last">
+									<form method="POST" action="?/deletePromotion" use:enhance>
+										<input type="hidden" name="id" value={p.id} />
+										<button
+											class="icon-btn danger"
+											type="submit"
+											aria-label="Delete the raise effective {p.effectiveDate}"
+											title="Delete"
+										>
+											<Icon name="trash" size={15} />
+										</button>
+									</form>
+								</td>
+							</tr>
+						{:else}
+							<tr><td class="empty" colspan="5">No promotions logged yet.</td></tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</section>
+	</div>
+
+	<section class="panel" aria-labelledby="periods-h">
+		<div class="panel-h">
+			<h2 id="periods-h">Periods</h2>
+			<span class="meta">{data.periods.length}</span>
 		</div>
-	</section>
+		<p class="panel-note">
+			Base and promotion rows are rewritten from the policy whenever it changes. A manual row is
+			never rewritten and outranks a generated one on the same date — it is how you correct a single
+			month.
+		</p>
+		<form class="panel-b form-row" method="POST" action="?/addPeriod" use:enhance>
+			<div class="field" style:width="9.5rem">
+				<label for="b-from">Effective from</label>
+				<input
+					id="b-from"
+					name="effective_from"
+					type="date"
+					value={typed.effective_from ?? data.today}
+					aria-describedby={failed === 'addPeriod' ? 'b-error' : undefined}
+					required
+				/>
+			</div>
+			{#each [['b-needs', 'needs', 'Needs'], ['b-wants', 'wants', 'Wants'], ['b-invest', 'invest', 'Investments']] as [id, name, label] (id)}
+				<div class="field" style:width="6.5rem">
+					<label for={id}>{label}<span class="visually-hidden"> %</span></label>
+					<span class="affix">
+						<input
+							{id}
+							class="pct"
+							{name}
+							value={typed[name] ?? ''}
+							inputmode="decimal"
+							autocomplete="off"
+							required
+						/>
+						<span class="post" aria-hidden="true">%</span>
+					</span>
+				</div>
+			{/each}
+			<button class="btn" type="submit"><Icon name="plus" />Add manual period</button>
+		</form>
+		{#if failed === 'addPeriod'}<p class="error panel-note" id="b-error" role="alert">
+				{message}
+			</p>{/if}
 
-	<!--
-	  Full width, and last: it is the tallest panel of the three, and left in a
-	  half-track it pushed the grid into a second row whose other column stood
-	  empty for 459px.
-	-->
-	<section class="panel wide">
-		<div class="panel-head"><h2>Periods</h2></div>
-		<div class="panel-body">
-			<p class="prose">
-				Base and promotion rows are rewritten from the policy above every time it changes. A manual
-				row is never rewritten and outranks a generated one on the same date, so it is how you
-				correct a single month.
-			</p>
-		</div>
-
-		<details class="entry-wrap" open>
-			<summary>Add a period</summary>
-			<form class="entry" method="POST" action="?/addPeriod" use:enhance>
-				<div class="field">
-					<label for="b-from">Effective from</label>
-					<input
-						id="b-from"
-						name="effective_from"
-						type="date"
-						value={typed.effective_from ?? data.today}
-						aria-describedby={failed === 'addPeriod' ? 'b-error' : undefined}
-						required
-					/>
-				</div>
-				<div class="field">
-					<label for="b-needs">Needs %</label>
-					<input
-						id="b-needs"
-						class="money"
-						name="needs"
-						value={typed.needs ?? ''}
-						inputmode="decimal"
-						autocomplete="off"
-						required
-					/>
-				</div>
-				<div class="field">
-					<label for="b-wants">Wants %</label>
-					<input
-						id="b-wants"
-						class="money"
-						name="wants"
-						value={typed.wants ?? ''}
-						inputmode="decimal"
-						autocomplete="off"
-						required
-					/>
-				</div>
-				<div class="field">
-					<label for="b-invest">Invest %</label>
-					<input
-						id="b-invest"
-						class="money"
-						name="invest"
-						value={typed.invest ?? ''}
-						inputmode="decimal"
-						autocomplete="off"
-						required
-					/>
-				</div>
-				<button class="primary" type="submit">Add period</button>
-			</form>
-			{#if failed === 'addPeriod'}<p class="error" id="b-error" role="alert">{message}</p>{/if}
-		</details>
-
-		<div class="table-wrap">
-			<table>
+		<div class="tbl-scroll">
+			<table class="tbl">
 				<thead>
 					<tr>
-						<th scope="col" class="date">Effective from</th>
+						<th scope="col" class="first">Effective from</th>
+						<th scope="col">Split</th>
 						<th scope="col" class="num">Needs</th>
 						<th scope="col" class="num">Wants</th>
 						<th scope="col" class="num">Invest</th>
-						<th scope="col">Source</th>
-						<th scope="col">Status</th>
+						<th scope="col" class="grow last">Source</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#each data.periods as period (period.id)}
-						<tr>
-							<!-- Periods run from the base year onward, so each row carries its own. -->
-							<td data-label="Effective from" class="date">{shortDate(period.effectiveFrom)}</td>
-							<td data-label="Needs" class="num">{formatBP(period.needsBP)}</td>
-							<td data-label="Wants" class="num">{formatBP(period.wantsBP)}</td>
-							<td data-label="Invest" class="num">{formatBP(period.investBP)}</td>
-							<!-- A source is a category, not a direction: monochrome, like a bucket tag. -->
-							<td data-label="Source"><span class="tag">{period.source}</span></td>
-							<td data-label={period.id === data.activeId ? 'Status' : null}>
-								{#if period.id === data.activeId}<span class="tag">active</span>{/if}
+						<tr class:current={period.id === data.activeId}>
+							<td class="first tnum">{shortDate(period.effectiveFrom)}</td>
+							<td>
+								<ShareBar
+									parts={[
+										{ key: 'needs', value: period.needsBP },
+										{ key: 'wants', value: period.wantsBP },
+										{ key: 'invest', value: period.investBP }
+									]}
+								/>
+							</td>
+							<td class="num">{formatBP(period.needsBP)}</td>
+							<td class="num">{formatBP(period.wantsBP)}</td>
+							<td class="num">{formatBP(period.investBP)}</td>
+							<td class="grow last">
+								<span class="tag">{period.source}</span>
+								{#if period.id === data.activeId}<span class="tag strong">in force</span>{/if}
 							</td>
 						</tr>
 					{:else}

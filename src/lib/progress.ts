@@ -1,6 +1,6 @@
 /**
  * Progress-meter presentation. Purely a view concern — the bar is a glance, the
- * number beside it is the truth (DESIGN.md § progress-meter).
+ * number beside it is the truth (DESIGN.md § Bullet).
  *
  * Thresholds: under 80% of allocation the bar is brand green, 80–100% amber,
  * over 100% loss red. When over budget, the track is rescaled to the true

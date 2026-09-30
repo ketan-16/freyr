@@ -1,6 +1,7 @@
 import { todayISO } from '$lib/dates';
 import { listPeriods, yearlyAllocation } from '$lib/server/budgets';
 import { priorYear } from '$lib/server/comparison';
+import { outflowByCategory, yearRange } from '$lib/server/insights';
 import { monthlyActualsForYear, years, yearlySummary } from '$lib/server/ledger';
 import type { PageServerLoad } from './$types';
 
@@ -32,6 +33,9 @@ export const load: PageServerLoad = ({ locals, url }) => {
 		awaitingIncome: months.length > 0 && allocation.income === 0,
 		// A year in progress compares against the same span of days; a completed
 		// year compares whole against whole.
-		prior: priorYear(locals.db, year, today)
+		prior: priorYear(locals.db, year, today),
+		today,
+		// One grouped query over the year's rows, behind the category ranking.
+		spendByCategory: outflowByCategory(locals.db, ...yearRange(year))
 	};
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { delta, formatCell } from './format';
+import { delta, formatCell, formatCompact, share } from './format';
 
 describe('formatCell', () => {
 	it('renders zero as an em dash, never as ₹0.00', () => {
@@ -59,5 +59,49 @@ describe('delta', () => {
 			arrow: '▼',
 			text: '-₹200'
 		});
+	});
+});
+
+describe('formatCompact', () => {
+	it('prints small figures as whole rupees', () => {
+		expect(formatCompact(0)).toBe('₹0');
+		expect(formatCompact(95000)).toBe('₹950');
+		expect(formatCompact(95049)).toBe('₹950');
+	});
+
+	it('uses thousands, lakhs and crores with one decimal dropped at zero', () => {
+		expect(formatCompact(123400)).toBe('₹1.2K');
+		expect(formatCompact(9500000)).toBe('₹95K');
+		expect(formatCompact(123456700)).toBe('₹12.3L');
+		expect(formatCompact(1500000000)).toBe('₹1.5Cr');
+		expect(formatCompact(10000000)).toBe('₹1L');
+	});
+
+	// A hundred of one unit is one of the next: 99,960 is a lakh, not "100K".
+	it('promotes a figure that rounds up into the next unit', () => {
+		expect(formatCompact(9996000)).toBe('₹1L');
+		expect(formatCompact(99960)).toBe('₹1K');
+		expect(formatCompact(999_960_000)).toBe('₹1Cr');
+	});
+
+	it('keeps the sign on a negative', () => {
+		expect(formatCompact(-123400)).toBe('-₹1.2K');
+	});
+});
+
+describe('share', () => {
+	it('rounds to a whole percentage', () => {
+		expect(share(1, 3)).toBe('33%');
+		expect(share(2, 3)).toBe('67%');
+		expect(share(3, 3)).toBe('100%');
+	});
+
+	it('never lets a sliver read as zero', () => {
+		expect(share(1, 1000)).toBe('<1%');
+		expect(share(0, 1000)).toBe('0%');
+	});
+
+	it('has no share of an empty whole', () => {
+		expect(share(5, 0)).toBe('—');
 	});
 });

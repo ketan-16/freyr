@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createCategory } from './categories';
 import { listTransactions } from './ledger';
 import { testDb } from './test-db';
-import { createFromForm, entryOptions } from './txn-form';
+import { createFromForm, entryOptions, updateFromForm } from './txn-form';
 
 let db: DatabaseSync;
 
@@ -145,5 +145,67 @@ describe('entryOptions', () => {
 			['wants', 'Eating out'],
 			['job', 'Salary']
 		]);
+	});
+});
+
+describe('updateFromForm', () => {
+	it('edits the posted row under the entry rules', () => {
+		const grocery = createCategory(db, { scope: 'needs', name: 'Grocery' });
+		const eatingOut = createCategory(db, { scope: 'wants', name: 'Eating out' });
+		const id = createFromForm(db, {
+			date: '2026-07-10',
+			amount: '100',
+			direction: 'outflow',
+			bucket: 'needs',
+			category: String(grocery)
+		});
+
+		updateFromForm(db, {
+			id: String(id),
+			date: '2026-07-11',
+			amount: '1,250.50',
+			direction: 'outflow',
+			bucket: 'wants',
+			category: String(eatingOut),
+			note: '  dinner  '
+		});
+
+		const [txn] = listTransactions(db, {});
+		expect(txn).toMatchObject({
+			id,
+			date: '2026-07-11',
+			amountPaise: 125050,
+			bucket: 'wants',
+			categoryName: 'Eating out',
+			note: 'dinner'
+		});
+	});
+
+	// The cross-table invariant holds on the way in whichever door it takes.
+	it('refuses a category from another bucket', () => {
+		const grocery = createCategory(db, { scope: 'needs', name: 'Grocery' });
+		const id = createFromForm(db, {
+			date: '2026-07-10',
+			amount: '100',
+			direction: 'outflow',
+			bucket: 'needs',
+			category: String(grocery)
+		});
+		expect(() =>
+			updateFromForm(db, {
+				id: String(id),
+				date: '2026-07-10',
+				amount: '100',
+				direction: 'outflow',
+				bucket: 'wants',
+				category: String(grocery)
+			})
+		).toThrow(/not a wants category/);
+	});
+
+	it('refuses a missing or malformed id', () => {
+		const values = { date: '2026-07-10', amount: '1', direction: 'outflow', bucket: 'needs' };
+		expect(() => updateFromForm(db, values)).toThrow(/no longer exists/);
+		expect(() => updateFromForm(db, { ...values, id: 'abc' })).toThrow(/no longer exists/);
 	});
 });

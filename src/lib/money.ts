@@ -52,6 +52,21 @@ export function formatMoney(p: Paise): string {
 	return `${sign}₹${grouped}${decimals}`;
 }
 
+/**
+ * Paise as the plain decimal an amount field accepts back: 125050 → "1250.50",
+ * 100000 → "1000". The inverse of `parseMoney` for the non-negative amounts a
+ * transaction stores — no symbol and no grouping, so an edit form can seed its
+ * field with it and post it straight back.
+ */
+export function toAmountInput(p: Paise): string {
+	if (!Number.isSafeInteger(p) || p < 0)
+		throw new Error(`toAmountInput expects non-negative paise, got ${p}`);
+	const paise = p % 100;
+	return paise === 0
+		? String(Math.trunc(p / 100))
+		: `${Math.trunc(p / 100)}.${String(paise).padStart(2, '0')}`;
+}
+
 function groupIndian(digits: string): string {
 	if (digits.length <= 3) return digits;
 	let head = digits.slice(0, -3);

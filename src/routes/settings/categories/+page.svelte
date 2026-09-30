@@ -1,153 +1,164 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import Icon from '$lib/components/Icon.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 
 	let { data, form } = $props();
 
 	/**
-	 * Every row posts to this page alongside the add bar, so a failure names the
-	 * form it belongs to and only that one shows the message.
+	 * Every row posts here alongside the add forms, so a failure names the form
+	 * it belongs to — and, for an add, the scope it was for — and only that one
+	 * shows the message.
 	 */
 	const failed = $derived(form?.failed);
 	const message = $derived(form?.error ?? '');
-	const typed = $derived(form?.values ?? {});
+	const typed = $derived<Record<string, string>>(form?.values ?? {});
+
+	/**
+	 * One column per bucket or income source, in the order the entry form offers
+	 * them. A scope that can no longer be picked (`other`, from imports) still
+	 * gets a column when something is filed under it, or those rows would vanish.
+	 */
+	const groups = $derived.by(() => {
+		const offered = data.scopes.map((s) => s.value as string);
+		const held = [...new Set(data.categories.map((c) => c.scope))].filter(
+			(scope) => !offered.includes(scope)
+		);
+		return [
+			...data.scopes.map((s) => ({ ...s, pickable: true })),
+			...held.map((value) => ({ value, label: data.labels[value], pickable: false }))
+		].map((scope) => {
+			const categories = data.categories.filter((c) => c.scope === scope.value);
+			return {
+				...scope,
+				categories,
+				live: categories.filter((c) => !c.archived).length,
+				used: categories.reduce((t, c) => t + c.used, 0)
+			};
+		});
+	});
 </script>
 
 <svelte:head>
 	<title>Categories — Freyr</title>
 </svelte:head>
 
-<div class="page-head">
-	<h1>Categories</h1>
-	<span class="context">What the ledger files each transaction under</span>
-</div>
+<PageHeader
+	title="Categories"
+	sub="What each transaction is filed under"
+	back={{ href: '/settings', label: 'Settings' }}
+/>
 
-<div class="panels">
-	<section class="panel wide">
-		<div class="panel-head">
-			<h2>Categories</h2>
-			<span class="meta">{data.categories.length}</span>
-		</div>
-		<div class="panel-body">
-			<p class="prose">
-				A category belongs to one bucket, or to one income source, and the entry bar offers only the
-				ones matching what you picked there. Renaming carries every transaction with it. A category
-				the ledger still points at is archived rather than deleted — it leaves the dropdown and
-				keeps its history.
-			</p>
-		</div>
+<div class="page">
+	<p class="lede">
+		A category belongs to one bucket or one income source, and the add form offers only the ones
+		matching what you picked. Renaming carries every transaction with it. One the ledger still
+		points at is archived rather than deleted — it leaves the form and keeps its history.
+	</p>
 
-		<details class="entry-wrap" open>
-			<summary>Add a category</summary>
-			<form class="entry" method="POST" action="?/add" use:enhance>
-				<div class="field">
-					<label for="c-scope">Applies to</label>
-					<select id="c-scope" name="scope">
-						{#each data.scopes as scope (scope.value)}
-							<option value={scope.value} selected={typed.scope === scope.value}>
-								{scope.label}
-							</option>
-						{/each}
-					</select>
+	<!-- Row edits have no control of their own to hang a message on. -->
+	{#if failed && failed !== 'add'}<p class="error" role="alert">{message}</p>{/if}
+
+	<div class="scope-cols">
+		{#each groups as group (group.value)}
+			<section class="panel" aria-labelledby="scope-{group.value}">
+				<div class="panel-h">
+					<h2
+						id="scope-{group.value}"
+						class="bk {group.value === 'investments' ? 'invest' : group.value}"
+					>
+						{group.label}
+					</h2>
+					<span class="meta">{group.live} · {group.used} used</span>
 				</div>
-				<div class="field grow">
-					<label for="c-name">Name</label>
-					<input
-						id="c-name"
-						name="name"
-						value={typed.name ?? ''}
-						autocomplete="off"
-						aria-describedby={failed === 'add' ? 'c-error' : undefined}
-						required
-					/>
-				</div>
-				<button class="primary" type="submit">Add category</button>
-			</form>
-			{#if failed === 'add'}<p class="error" id="c-error" role="alert">{message}</p>{/if}
-		</details>
-
-		<!-- Row edits have no control of their own to hang a message on. -->
-		{#if failed && failed !== 'add'}<p class="error" role="alert">{message}</p>{/if}
-
-		<div class="table-wrap">
-			<table>
-				<thead>
-					<tr>
-						<th scope="col">Applies to</th>
-						<th scope="col">Name</th>
-						<th scope="col" class="num">Used</th>
-						<th scope="col">Status</th>
-						<th scope="col"><span class="visually-hidden">Actions</span></th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each data.categories as category (category.id)}
-						<tr>
-							<td data-label="Applies to"><span class="tag">{data.labels[category.scope]}</span></td
+				{#if group.pickable}
+					<form class="cat-add" method="POST" action="?/add" use:enhance>
+						<input type="hidden" name="scope" value={group.value} />
+						<label class="visually-hidden" for="add-{group.value}">New {group.label} category</label
+						>
+						<input
+							id="add-{group.value}"
+							name="name"
+							value={failed === 'add' && typed.scope === group.value ? (typed.name ?? '') : ''}
+							placeholder="Add {/^[aeiou]/i.test(group.label)
+								? 'an'
+								: 'a'} {group.label.toLowerCase()} category"
+							autocomplete="off"
+							aria-describedby={failed === 'add' && typed.scope === group.value
+								? `err-${group.value}`
+								: undefined}
+							required
+						/>
+						<button class="btn" type="submit" aria-label="Add to {group.label}">
+							<Icon name="plus" />
+						</button>
+					</form>
+					{#if failed === 'add' && typed.scope === group.value}
+						<p class="error panel-note" id="err-{group.value}" role="alert">{message}</p>
+					{/if}
+				{/if}
+				<div class="cat-list">
+					{#each group.categories as c (c.id)}
+						<div class="cat-row" class:archived={c.archived}>
+							<!--
+							  The row is one form; the buttons reach it by id and pick their own
+							  action, so rename, archive and delete share the name field.
+							-->
+							<form class="rename" id="cat-{c.id}" method="POST" action="?/rename" use:enhance>
+								<input type="hidden" name="id" value={c.id} />
+								<input
+									class="row-input"
+									name="name"
+									value={c.name}
+									aria-label="Name of {c.name}"
+									autocomplete="off"
+									required
+								/>
+							</form>
+							{#if c.archived}<span class="tag">archived</span>{/if}
+							<span class="used" title="Transactions filed under it">{c.used}</span>
+							<button
+								class="icon-btn save"
+								type="submit"
+								form="cat-{c.id}"
+								aria-label="Save the name of {c.name}"
+								title="Save name"
 							>
-							<td data-label="Name">
-								<!--
-								  The row is one form; the buttons in the last cell reach it by id
-								  and pick their own action, so a rename, an archive and a delete
-								  share the name field they all act on.
-								-->
-								<form id="cat-{category.id}" method="POST" action="?/rename" use:enhance>
-									<input type="hidden" name="id" value={category.id} />
-									<input
-										class="row-input"
-										name="name"
-										value={category.name}
-										aria-label="Name of {category.name}"
-										autocomplete="off"
-										required
-									/>
-								</form>
-							</td>
-							<td data-label="Used" class="num">{category.used}</td>
-							<td data-label={category.archived ? 'Status' : null}>
-								{#if category.archived}<span class="tag">archived</span>{/if}
-							</td>
-							<td data-label="" class="cell-actions">
+								<Icon name="check" size={15} />
+							</button>
+							<button
+								class="icon-btn"
+								type="submit"
+								form="cat-{c.id}"
+								formaction="?/archive"
+								name="archived"
+								value={c.archived ? '0' : '1'}
+								aria-label={c.archived ? `Restore ${c.name}` : `Archive ${c.name}`}
+								title={c.archived ? 'Restore' : 'Archive'}
+							>
+								<Icon name={c.archived ? 'archive-restore' : 'archive'} size={15} />
+							</button>
+							<!-- Delete only where it cannot strip a label off history. -->
+							{#if c.used === 0}
 								<button
-									class="icon"
+									class="icon-btn danger"
 									type="submit"
-									form="cat-{category.id}"
-									aria-label="Save the name of {category.name}"
+									form="cat-{c.id}"
+									formaction="?/delete"
+									aria-label="Delete {c.name}"
+									title="Delete"
 								>
-									<Icon name="check" />
+									<Icon name="trash" size={15} />
 								</button>
-								<button
-									class="icon"
-									type="submit"
-									form="cat-{category.id}"
-									formaction="?/archive"
-									name="archived"
-									value={category.archived ? '0' : '1'}
-									aria-label={category.archived
-										? `Restore ${category.name}`
-										: `Archive ${category.name}`}
-								>
-									<Icon name={category.archived ? 'archive-restore' : 'archive'} />
-								</button>
-								<!-- Deleting is offered only where it cannot strip a label off history. -->
-								{#if category.used === 0}
-									<button
-										class="icon"
-										type="submit"
-										form="cat-{category.id}"
-										formaction="?/delete"
-										aria-label="Delete {category.name}"
-									>
-										<Icon name="trash" />
-									</button>
-								{/if}
-							</td>
-						</tr>
+							{:else}
+								<span class="icon-slot" aria-hidden="true"></span>
+							{/if}
+						</div>
 					{:else}
-						<tr><td class="empty" colspan="5">No categories yet.</td></tr>
+						<p class="empty-note">None yet.</p>
 					{/each}
-				</tbody>
-			</table>
-		</div>
-	</section>
+				</div>
+			</section>
+		{/each}
+	</div>
 </div>
