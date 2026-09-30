@@ -26,6 +26,9 @@
 		const d = dialog;
 		if (!d) return;
 		if (ui.sheetOpen && !d.open) {
+			// A fresh sheet: the last save's in-flight flag must not carry over,
+			// or its buttons open disabled and a phone has no way to close it.
+			busy = false;
 			d.showModal();
 			tick().then(() => d.querySelector<HTMLInputElement>('[data-autofocus]')?.focus());
 		} else if (!ui.sheetOpen && d.open) {
@@ -37,6 +40,7 @@
 		if (!ui.sheetTxn && answers.direction) remembered = answers;
 		ui.toast(message);
 		ui.sheetOpen = false;
+		busy = false;
 	}
 </script>
 
