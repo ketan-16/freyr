@@ -10,6 +10,7 @@
 	import { enhance } from '$app/forms';
 	import type { Category, CategoryScope } from '$lib/server/categories';
 	import type { Bucket, Direction, Source } from '$lib/server/ledger';
+	import { useUi } from '$lib/ui.svelte';
 	import Icon from './Icon.svelte';
 	import Notice from './Notice.svelte';
 
@@ -35,6 +36,7 @@
 		error?: string;
 	} = $props();
 
+	const ui = useUi();
 	let amountInput: HTMLInputElement | undefined = $state();
 	/** A second Enter while the first add is in flight would post it twice. */
 	let busy = $state(false);
@@ -76,9 +78,12 @@
 				return;
 			}
 			busy = true;
-			return async ({ update }) => {
+			return async ({ result, update }) => {
 				await update();
 				busy = false;
+				// Offline, the row cannot appear in the table yet: say where it went.
+				if (result.type === 'success' && result.status === 202)
+					ui.toast('Added · syncs when online');
 				amountInput?.focus();
 			};
 		}}

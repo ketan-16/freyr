@@ -8,7 +8,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { isTyping } from '$lib/ui.svelte';
+	import { anchorPopover, isTyping } from '$lib/ui.svelte';
 	import Icon from './Icon.svelte';
 
 	type Step = { href: string; label: string } | null;
@@ -32,23 +32,13 @@
 	let pop = $state<HTMLElement>();
 	let button = $state<HTMLButtonElement>();
 
-	/** Anchor the popover under its button; the top layer is viewport-fixed. */
-	function place(): void {
-		if (!pop || !button) return;
-		const r = button.getBoundingClientRect();
-		const width = 240;
-		const left = Math.min(Math.max(8, r.left + r.width / 2 - width / 2), innerWidth - width - 8);
-		pop.style.inset = 'auto';
-		pop.style.margin = '0';
-		pop.style.top = `${r.bottom + 6}px`;
-		pop.style.left = `${left}px`;
-	}
-
 	$effect(() => {
 		const el = pop;
 		if (!el) return;
 		const onToggle = (e: Event) => {
-			if ((e as ToggleEvent).newState === 'open') place();
+			// Under its button; 240px is the .picker width (15rem).
+			if ((e as ToggleEvent).newState === 'open' && button)
+				anchorPopover(el, button, { width: 240, side: 'below' });
 		};
 		el.addEventListener('beforetoggle', onToggle);
 		return () => el.removeEventListener('beforetoggle', onToggle);

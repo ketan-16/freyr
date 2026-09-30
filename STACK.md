@@ -38,12 +38,13 @@ explicit rounding helper. Enforced in code and by SQLite `CHECK` constraints.
 
 ## Standard add-ons (deliberately few)
 
-| Need             | Choice                                                                  | Notes                                                                                                                                                                                                                               |
-| ---------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Auth             | **`bcryptjs`** (pure JS) + session cookie backed by a sessions table    | Single user, created on first run. Multi-user-ready schema. Cookies `HttpOnly` + `SameSite=Lax`; CSRF via SvelteKit's built-in origin check on form actions.                                                                        |
-| Excel import     | **`exceljs`** (pure JS)                                                 | One-time seed import from the old workbook, via `npm run import`.                                                                                                                                                                   |
-| Backups          | built-in: daily `VACUUM INTO backups/freyr-YYYY-MM-DD.db`, keep last 30 | One consistent snapshot file per day. **Offsite is required, not optional:** `backups/` must live in (or sync to) a replicated location (e.g. a Syncthing/Drive folder) so a dead disk can't take the app and every backup with it. |
-| TS script runner | **`tsx`** (dev-only)                                                    | Runs the import CLI script directly.                                                                                                                                                                                                |
+| Need             | Choice                                                                                            | Notes                                                                                                                                                                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth             | **`bcryptjs`** (pure JS) + session cookie backed by a sessions table                              | Single user, created on first run. Multi-user-ready schema. Cookies `HttpOnly` + `SameSite=Lax`; CSRF via SvelteKit's built-in origin check on form actions.                                                                        |
+| Excel import     | **`exceljs`** (pure JS)                                                                           | One-time seed import from the old workbook, via `npm run import`.                                                                                                                                                                   |
+| Backups          | built-in: daily `VACUUM INTO backups/freyr-YYYY-MM-DD.db`, keep last 30                           | One consistent snapshot file per day. **Offsite is required, not optional:** `backups/` must live in (or sync to) a replicated location (e.g. a Syncthing/Drive folder) so a dead disk can't take the app and every backup with it. |
+| Offline / PWA    | **SvelteKit's service worker** (`src/service-worker.ts`) + Cache Storage + IndexedDB — no library | Online first: pages and their data are kept as they load, writes made offline queue on the device and replay in order. A web app manifest makes it installable. Browsers run it only on HTTPS or `localhost`.                       |
+| TS script runner | **`tsx`** (dev-only)                                                                              | Runs the import CLI script directly.                                                                                                                                                                                                |
 
 ## Serving & security posture
 
@@ -51,7 +52,9 @@ Freyr binds to **`0.0.0.0:3000`** by default — `adapter-node`'s defaults, reac
 interface on the box. Set `HOST=127.0.0.1` to restrict it to localhost. Remote/phone
 access is expected via the box's network layer — trusted LAN, or better, a
 **Tailscale**/WireGuard address. Freyr does not terminate TLS; if exposure beyond a trusted
-network is ever wanted, put a reverse proxy (e.g. Caddy) in front. Do not port-forward
+network is ever wanted, put a reverse proxy (e.g. Caddy) in front. HTTPS is also what turns on
+offline support and installing: browsers run service workers only on HTTPS or `localhost`, so
+on a plain-HTTP address Freyr is online-only. Do not port-forward
 Freyr to the open internet.
 
 ## Testing & quality
@@ -63,7 +66,8 @@ Freyr to the open internet.
 
 ## Deliberately not included (YAGNI)
 
-No ORM, no Tailwind/component library, no client-side data fetching or state libraries, no
-separate API layer, no Postgres, no Redis, no Docker requirement (an image can come later if
+No ORM, no Tailwind/component library, no client-side data fetching or state libraries (the
+service worker caches what `load` rendered and replays the form posts pages already send), no
+Workbox, no separate API layer, no Postgres, no Redis, no Docker requirement (an image can come later if
 ever wanted), no native addons anywhere in the dependency tree. Add pieces only when a
 concrete feature demands them.

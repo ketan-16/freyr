@@ -17,14 +17,25 @@ src/hooks.server.ts            — boot: open+migrate db once, rebuild the budge
                                  projection, session cookie → locals.user, auth guard
                                  (no users → /setup, unauthenticated → /login),
                                  theme cookie → <html data-theme> via transformPageChunk,
-                                 hourly backup timer
+                                 replayed writes applied once (x-freyr-key), hourly
+                                 backup timer
+src/service-worker.ts          — offline: precaches the release's files, keeps pages and
+                                 their data network-first, queues writes in IndexedDB and
+                                 replays them in order (see Offline, below)
 src/app.css                    — the whole stylesheet: tokens (both themes), shell, page
                                  header, 12-column grid (container queries), panels, controls,
                                  tables, the chart system, dialogs, responsive rules.
                                  Implements DESIGN.md
 src/lib/money.ts               — integer-paise money: parse ("1,23,456.78" → paise),
-                                 Indian-grouped format, basis-point math (mulBP), and
-                                 toAmountInput (paise → the plain decimal a field posts back)
+                                 Indian-grouped format, basis-point math (mulBP),
+                                 toAmountInput (paise → the plain decimal a field posts back),
+                                 and the phone keypad: keyAmount (one press, operators
+                                 included) and evaluateAmount (a sum → paise, exact BigInt
+                                 fractions, one rounding)
+src/lib/offline.ts             — what the worker, the page and the server share: queued-write
+                                 types, the data-cache key and skip-node merge, judging a
+                                 replay's answer, a queued write described in words
+src/lib/theme.ts               — the theme setting's three values (system/light/dark)
 src/lib/dates.ts               — YYYY-MM-DD string helpers (no Date-object state), display
                                  labels (monthLabel, shortDate, dayLabel, shortMonth), weekday,
                                  addMonths
@@ -34,18 +45,24 @@ src/lib/format.ts              — figure presentation: formatCell (zero → em 
 src/lib/progress.ts            — meter thresholds and, over the cap, the rescaled fill + excess
 src/lib/chart.ts               — chart geometry, pure: niceScale (1/2/2.5/5 ticks), pct,
                                  cumulative, linePath/areaPath in a 0–100 viewBox
-src/lib/ui.svelte.ts           — the shell's client state (sheet, command menu, toasts) as a
-                                 class with $state fields, provided per app through context;
-                                 isTyping / wantsNewTab helpers for shortcuts and links
+src/lib/ui.svelte.ts           — the shell's client state (sheet, command menu, toasts, theme
+                                 setting) as a class with $state fields, provided per app
+                                 through context; isTyping / wantsNewTab / anchorPopover
+src/lib/sync.svelte.ts         — the page's side of offline: the worker's status (reachable,
+                                 waiting, refused) as $state, and the nudges that drain the
+                                 queue where Background Sync is missing (online, foreground)
 src/lib/components/            — shell: PageHeader, Stepper (+ MonthNav), TxnSheet, TxnForm,
-                                 CommandMenu, EntryBar, ThemeToggle, FreyrMark, Icon (Lucide
-                                 paths); figures: Money, Delta, Kpi, Bullet, ShareBar, Notice;
+                                 CommandMenu, EntryBar, ThemeSwitch (+ ThemeToggle, its
+                                 sidebar menu), SyncStatus, FreyrMark, Icon (Lucide paths);
+                                 figures: Money, Delta, Kpi, Bullet, ShareBar, Notice;
                                  charts: PaceChart, DailyChart, MonthChart, SplitChart,
                                  Sparkline, Ranks
 src/lib/server/db/             — open (WAL, busy_timeout, foreign_keys), migration runner,
                                  SQLITE_CONSTRAINT_UNIQUE; migrations bundled via Vite
                                  ?raw glob (fs fallback for tsx)
 src/lib/server/auth.ts         — users (bcryptjs), sessions (sha256 token at rest, 90d)
+src/lib/server/replay.ts       — at-most-once for writes the worker may send twice: an
+                                 in-memory, bounded map of key → first answer
 src/lib/server/ledger.ts       — transactions: create, get, update (form-owned fields only),
                                  delete, list; monthly/yearly rollups (conditional
                                  aggregation, one query)
@@ -74,7 +91,9 @@ src/routes/                    — thin +page.server.ts (parse → domain → re
                                  / (home), /ledger, /ledger/[id] (edit + delete), /monthly,
                                  /yearly, /settings (hub), /settings/budget,
                                  /settings/categories, /login, /setup, /logout,
-                                 /theme (POST: set cookie, bounce back); +error.svelte
+                                 /theme (POST: set or clear the cookie, bounce back);
+                                 +error.svelte (503 is the worker's "not saved offline")
+static/                        — favicon, the web app manifest and its icons (from FreyrMark)
 scripts/import.ts              — CLI import entry (tsx) with verification report
 scripts/dump-workbook.ts       — dev utility: dump an xlsx's raw cell layout
 ```
@@ -134,6 +153,41 @@ page's `form`. The categories it offers come from the root layout's `load`, whic
 when a form action invalidates the page. Without script, the add controls are links to the
 ledger's entry bar and a row is a link to `/ledger/:id`, whose own actions redirect back to the
 ledger month it came from.
+
+**Offline.** `src/service-worker.ts` sits between every page and the server, and SvelteKit
+registers it on every page. It is online first:
+
+- **The release's own files** (`$service-worker`'s `build` and `files`) are cached at install and
+  served from the cache; their names carry a hash. The previous release's files are kept too, so
+  a page still running it can load the rest of its code offline.
+- **Pages and their data** go to the network; a 200 is kept (per release, at most 80) and served
+  when the network fails, answers 502–504 (the proxy with Freyr down), or takes over 4 s — the
+  late answer still lands in the cache and marks Freyr reachable, which refreshes the page.
+  `__data.json` is keyed without `x-sveltekit-invalidated`, and a `skip` node is filled from the
+  kept copy, so one entry answers every request for that page. A page never kept answers 503 —
+  in-app, because the root layout's data is kept separately for the error page to render in.
+- **Every main screen is kept without being visited**: the home page whole (a cold start opens
+  on it) and each screen's data, after each release, each sync, and when the app is put away
+  after a change.
+- **Writes** — every script-sent form action and `/theme`, never login/setup/logout — go
+  straight out when nothing is waiting. If Freyr cannot be reached the write is stored in
+  IndexedDB (URL, the headers that matter, the url-encoded body) and the page gets a synthetic
+  `{type:'success', status: 202}`: the sheet says _syncs when online_. Anything already waiting
+  goes first, so the server always sees writes in the order they were made. The queue replays
+  on Background Sync (Chromium), and — for Safari, which has none — whenever a page says the
+  connection may be back (`online`, returning to the foreground, every 30 s while writes wait).
+  A replay's answer is judged by `judge()`: saved, refused (parked with the server's reason for
+  Retry or Discard), or not yet (unreachable, busy, or a sign-in redirect — which looks exactly
+  like a saved write's redirect, so it is told apart by where it points).
+- **At most once.** Every attempt at one write carries the same `x-freyr-key`; `hooks.server.ts`
+  runs a keyed write once and repeats its first answer to any later attempt
+  (`$lib/server/replay`), so a write whose answer was lost on a failing connection is not
+  applied twice when it is replayed.
+- **Signing out** deletes the kept pages, so nothing of the user's stays readable on the device.
+
+The page's side is `sync.svelte.ts`: it holds what the worker reports and refreshes the page
+(`invalidateAll`) when writes land or Freyr becomes reachable again. `SyncStatus` shows it — only
+when there is something to say.
 
 **Chart data** is read alongside each page's figures: `insights.ts` adds one grouped query per
 chart (the month day by day, the months of a range, spend by category), each a range scan of
@@ -201,12 +255,15 @@ from a raw dump of the real workbook:
   Rules that had been re-derived per page are what shipped `₹0.00` to the yearly page.
 - **Sessions store sha256(token), never the token.** Cookie is HttpOnly + SameSite=Lax;
   CSRF via SvelteKit's built-in origin check.
-- **Theme is a cookie resolved on the server, not client state.** `hooks.server.ts` reads
-  `freyr_theme` and stamps `data-theme` onto `<html>` through `transformPageChunk`, so the
-  correct theme is in the first byte — no flash, no blocking inline script. The toggle is a
-  form action (`POST /theme`), so it works with JavaScript off. No cookie means no attribute,
-  and `prefers-color-scheme` decides. `/theme` is exempt from both auth redirects so the
-  toggle also works on the login and setup screens.
+- **Theme is a cookie resolved on the server, and the page's to change.** `hooks.server.ts`
+  reads `freyr_theme` and stamps `data-theme` onto `<html>` through `transformPageChunk`, so the
+  correct theme is in the first byte — no flash, no blocking inline script. The setting has three
+  answers: Light and Dark set the cookie; System clears it, and with no cookie there is no
+  attribute and `prefers-color-scheme` decides. Every control is a form posting to `/theme`, so
+  it works with JavaScript off; with it, `Ui.setTheme` swaps the attribute at once and posts
+  behind it (queued like any write when offline) — the running page is the authority from then
+  on, seeded from the cookie. `/theme` is exempt from both auth redirects so it also works on
+  the login and setup screens.
 - **Every cookie sets `secure: false` explicitly.** Freyr does not terminate TLS and is reached
   over a plain-HTTP LAN or Tailscale address, but SvelteKit defaults `secure` to true off
   localhost — and a browser silently drops a Secure cookie on `http://`. The theme cookie
@@ -249,6 +306,24 @@ from a raw dump of the real workbook:
   every category is offered grouped by what it belongs to. The server's scope check in
   `txn-form.ts` refuses a mismatched pair either way, so the browser's list is a convenience, not
   the rule.
+- **Offline by a hand-written service worker, with no schema change.** No Workbox and no
+  client data layer: the worker caches what `load` already produced and replays the form posts
+  the page already sends, so every page, action and validation rule is unchanged, and offline
+  pages are simply the last server render. The price is that what was changed offline is not
+  in the figures until it syncs — the sync status lists it instead of an optimistic copy of the
+  domain rules in the browser. Duplicate protection is an in-memory map rather than a stored
+  key: it needs no migration, and its one gap is a server restart between a lost answer and
+  its replay. Browsers run service workers only on HTTPS or `localhost`; on a plain-HTTP
+  address all of this is simply absent and Freyr behaves as before.
+- **A release takes over at once, and an open page follows on its next navigation.** The new
+  worker skips waiting; each status message carries its release, and a page whose own build
+  differs makes its next navigation a full load (when online). Deciding by version rather than
+  by "a worker took over" matters: the first worker to install, or a page that already loaded
+  the new release from the network, is not behind.
+- **The keypad's calculator is money arithmetic, so it lives in `money.ts`.** A sum is typed as
+  display text (`1,200 + 45 × 3`) and never becomes a float: `evaluateAmount` works in BigInt
+  fractions of paise with × and ÷ first, and rounds once, half away from zero. The server never
+  sees a sum — the form posts what it comes to — so no action changed.
 - **Design decisions live in [DESIGN.md](DESIGN.md)**, which is the target `src/app.css`
   implements. Colour choices there are contrast-verified rather than asserted.
 

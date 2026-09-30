@@ -1,22 +1,53 @@
 <script lang="ts">
-	import { beforeNavigate, goto } from '$app/navigation';
+	import { onMount, untrack } from 'svelte';
+	import { beforeNavigate, goto, invalidateAll, replaceState } from '$app/navigation';
 	import { navigating, page } from '$app/state';
 	import CommandMenu from '$lib/components/CommandMenu.svelte';
 	import FreyrMark from '$lib/components/FreyrMark.svelte';
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
+	import SyncStatus from '$lib/components/SyncStatus.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import TxnSheet from '$lib/components/TxnSheet.svelte';
+	import { provideSync } from '$lib/sync.svelte';
 	import { isTyping, provideUi, wantsNewTab } from '$lib/ui.svelte';
 	import '../app.css';
 
 	let { children, data } = $props();
 
-	const ui = provideUi();
+	const ui = provideUi(untrack(() => (data.themeChosen ? data.theme : 'system')));
+	const sync = provideSync();
 
-	// A link followed from inside the sheet or the menu leaves them behind.
-	beforeNavigate(() => {
+	const signedIn = $derived(data.user != null);
+
+	// Offline support runs for a signed-in session: the service worker keeps
+	// its screens and replays its writes; this page refreshes when they land.
+	// An effect rather than onMount, because signing in never remounts this.
+	$effect(() => {
+		if (!signedIn) return;
+		return untrack(() =>
+			sync.start(invalidateAll, (count) =>
+				ui.toast(`Synced ${count} change${count === 1 ? '' : 's'} made offline`)
+			)
+		);
+	});
+
+	onMount(() => {
+		// The home-screen shortcut: straight into the add sheet.
+		if (data.user && page.url.searchParams.has('new')) {
+			const url = new URL(page.url);
+			url.searchParams.delete('new');
+			replaceState(url, {});
+			ui.add();
+		}
+	});
+
+	beforeNavigate(({ willUnload, to }) => {
+		// A link followed from inside the sheet or the menu leaves them behind.
 		ui.sheetOpen = false;
 		ui.menuOpen = false;
+		// A new release took over mid-session: load its code, not the old one's.
+		// Offline the old code carries on — its files are still kept.
+		if (sync.updated && sync.online && !willUnload && to?.url) location.href = to.url.href;
 	});
 
 	type Link = { href: string; label: string; icon: IconName; key: string; match?: string };
@@ -92,8 +123,8 @@
 	<link rel="icon" href="/favicon.svg" />
 	<!-- The browser chrome matches the surface the top of every screen sits on;
 	     with no theme chosen, the OS decides that too. -->
-	{#if data.themeChosen}
-		<meta name="theme-color" content={data.theme === 'dark' ? '#111113' : '#ffffff'} />
+	{#if ui.theme !== 'system'}
+		<meta name="theme-color" content={ui.theme === 'dark' ? '#111113' : '#ffffff'} />
 	{:else}
 		<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
 		<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111113" />
@@ -160,12 +191,13 @@
 
 				<div class="side-spacer"></div>
 
+				<SyncStatus side="above" />
 				<div class="side-foot">
 					<a class="avatar" href="/settings" aria-label="Settings" title="Settings"
 						>{data.user.username.slice(0, 1)}</a
 					>
 					<span class="who">{data.user.username}</span>
-					<ThemeToggle theme={data.theme} id="theme-form" />
+					<ThemeToggle />
 					<form method="POST" action="/logout" id="logout-form">
 						<button
 							class="icon-btn"

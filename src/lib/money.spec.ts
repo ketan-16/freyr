@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+	evaluateAmount,
 	formatBP,
 	formatMoney,
 	fromRupees,
+	hasOperator,
 	mulBP,
 	parseMoney,
 	parsePercentBP,
@@ -187,5 +189,93 @@ describe('keyAmount', () => {
 	it('always yields what parseMoney reads back exactly', () => {
 		expect(parseMoney(type(['1', '2', '5', '0', '.', '5']))).toBe(125050);
 		expect(parseMoney(type(['2', '00', '00']))).toBe(2000000);
+	});
+});
+
+describe('keyAmount, with the calculator keys', () => {
+	const type = (keys: string[]) => keys.reduce(keyAmount, '');
+
+	it('starts the next number of a sum, each grouped on its own', () => {
+		expect(type(['1', '2', '0', '0', '+', '4', '5'])).toBe('1,200 + 45');
+		expect(type(['9', '×', '1', '2', '5', '0', '0', '0'])).toBe('9 × 1,25,000');
+		expect(type(['1', '.', '5', '÷', '3', '−', '.', '2'])).toBe('1.5 ÷ 3 − 0.2');
+	});
+
+	it('swaps an operator pressed twice, and never starts with one', () => {
+		expect(type(['1', '2', '+', '×'])).toBe('12 × ');
+		expect(type(['+'])).toBe('');
+		expect(type(['−', '5'])).toBe('5');
+	});
+
+	it('applies the lone-amount rules to each number', () => {
+		expect(type(['5', '+', '0', '0', '7'])).toBe('5 + 7');
+		expect(type(['5', '+', '1', '.', '2', '3', '4'])).toBe('5 + 1.23');
+		expect(type(['1', '+', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9'])).toBe(
+			'1 + 99,99,99,999'
+		);
+	});
+
+	it('deletes back through numbers and operators', () => {
+		expect(keyAmount('12 + 45', 'del')).toBe('12 + 4');
+		expect(keyAmount('12 + 4', 'del')).toBe('12 + ');
+		expect(keyAmount('12 + ', 'del')).toBe('12');
+		expect(keyAmount('1,200 + ', 'del')).toBe('1,200');
+	});
+
+	it('says when there is a sum to work out', () => {
+		expect(hasOperator('1,200 + 45')).toBe(true);
+		expect(hasOperator('12 + ')).toBe(true);
+		expect(hasOperator('1,200')).toBe(false);
+		expect(hasOperator('')).toBe(false);
+	});
+});
+
+describe('evaluateAmount', () => {
+	it('adds, subtracts, multiplies and divides in paise', () => {
+		expect(evaluateAmount('1,200 + 45')).toBe(124500);
+		expect(evaluateAmount('500 − 120.50')).toBe(37950);
+		expect(evaluateAmount('120 × 3')).toBe(36000);
+		expect(evaluateAmount('12.5 × 1.5')).toBe(1875);
+		expect(evaluateAmount('1,000 ÷ 4')).toBe(25000);
+	});
+
+	it('multiplies and divides before it adds and subtracts', () => {
+		expect(evaluateAmount('50 + 3 × 120')).toBe(41000);
+		expect(evaluateAmount('100 − 20 ÷ 4 × 2')).toBe(9000);
+		expect(evaluateAmount('10 − 2 − 3')).toBe(500);
+		expect(evaluateAmount('240 ÷ 2 ÷ 3')).toBe(4000);
+	});
+
+	it('works in exact fractions and rounds once, halves away from zero', () => {
+		// 1000 ÷ 3 = 333.333…: the rounding is at the end, not at each step.
+		expect(evaluateAmount('1,000 ÷ 3')).toBe(33333);
+		expect(evaluateAmount('1,000 ÷ 3 × 3')).toBe(100000);
+		expect(evaluateAmount('0.01 × 0.5')).toBe(1);
+		expect(evaluateAmount('0.05 ÷ 2')).toBe(3);
+	});
+
+	it('stays exact past the float range', () => {
+		expect(evaluateAmount('99,99,99,999 × 99,99,99,999 ÷ 99,99,99,999')).toBe(99999999900);
+	});
+
+	it('ignores a trailing operator', () => {
+		expect(evaluateAmount('1,200 + ')).toBe(120000);
+	});
+
+	it('refuses what cannot be an amount, in words', () => {
+		expect(() => evaluateAmount('5 ÷ 0')).toThrow('Can’t divide by zero.');
+		expect(() => evaluateAmount('100 − 180')).toThrow(
+			'That comes to -₹80; an amount has to be more than ₹0.'
+		);
+		expect(() => evaluateAmount('5 − 5')).toThrow('more than ₹0');
+		expect(() => evaluateAmount('99,99,99,999 + 1')).toThrow('more than ₹99,99,99,999.99');
+		expect(() => evaluateAmount('0.001 × 1')).toThrow();
+	});
+
+	// What the calculator hands back, the keypad and the server both read.
+	it('round-trips through the field', () => {
+		const paise = evaluateAmount('1,250.50 × 2 + 0.25');
+		expect(paise).toBe(250125);
+		expect(parseMoney(groupTyped(toAmountInput(paise)))).toBe(paise);
 	});
 });

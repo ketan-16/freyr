@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+	import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
 
 	let { data } = $props();
 
@@ -54,13 +54,13 @@
 	<section class="panel" aria-labelledby="set-look">
 		<div class="panel-h"><h2 id="set-look">Appearance</h2></div>
 		<div class="set-list">
-			<div class="set-item">
-				<span class="ico"><Icon name="monitor" /></span>
+			<div class="set-item wrap">
+				<span class="ico"><Icon name="sun" /></span>
 				<span class="txt">
 					<b>Theme</b>
-					<small>Follows the system until you choose; the choice is kept in a cookie.</small>
+					<small>System follows this device's light or dark setting.</small>
 				</span>
-				<ThemeToggle theme={data.theme} withLabel />
+				<ThemeSwitch />
 			</div>
 		</div>
 	</section>

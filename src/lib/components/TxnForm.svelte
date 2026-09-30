@@ -9,12 +9,22 @@
   behaves like any enhanced form and follows the redirect.
 -->
 <script lang="ts">
-	import { onMount, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { todayISO } from '$lib/dates';
-	import { formatMoney, groupTyped, keyAmount, parseMoney, toAmountInput } from '$lib/money';
+	import {
+		evaluateAmount,
+		formatMoney,
+		groupTyped,
+		hasOperator,
+		keyAmount,
+		OPERATORS,
+		parseMoney,
+		toAmountInput
+	} from '$lib/money';
+	import { signsIn } from '$lib/offline';
 	import type { Category, CategoryScope } from '$lib/server/categories';
 	import type { Bucket, Direction, Source, Txn } from '$lib/server/ledger';
 	import Icon from './Icon.svelte';
@@ -130,9 +140,45 @@
 	});
 	const pad = $derived(keypad && phone && !readOnly);
 
+	let amountInput = $state<HTMLInputElement>();
+
 	function press(key: string): void {
 		amount = keyAmount(amount, key);
 		error = '';
+		// A sum can outgrow the field: keep its end, the part being typed, in view.
+		tick().then(() => amountInput && (amountInput.scrollLeft = amountInput.scrollWidth));
+	}
+
+	/**
+	 * The keypad's calculator: with a sum on it, the tall key works it out
+	 * instead of submitting, and the field shows faintly what it comes to.
+	 */
+	const sum = $derived(hasOperator(amount));
+	const worked = $derived.by(() => {
+		if (!sum) return null;
+		try {
+			return formatMoney(evaluateAmount(amount));
+		} catch {
+			return null;
+		}
+	});
+	const OPERATOR_NAMES: Record<string, string> = {
+		'÷': 'Divided by',
+		'×': 'Times',
+		'−': 'Minus',
+		'+': 'Plus'
+	};
+
+	/** Put what the sum comes to in its place; false, with the reason shown, when it cannot. */
+	function equals(): boolean {
+		try {
+			amount = groupTyped(toAmountInput(evaluateAmount(amount)));
+			error = '';
+			return true;
+		} catch (err) {
+			error = err instanceof Error ? err.message : String(err);
+			return false;
+		}
 	}
 	const SCOPE_NAMES: Record<string, string> = {
 		needs: 'Needs',
@@ -188,10 +234,18 @@
 	// A second Enter or tap while the first post is in flight is dropped: the
 	// sheet stays open with the same values until the page has refreshed, and
 	// without this guard that window posts the same entry twice.
-	const submit: SubmitFunction = ({ cancel }) => {
+	const submit: SubmitFunction = ({ cancel, formData }) => {
 		if (busy) {
 			cancel();
 			return;
+		}
+		// A sum still on the keypad (the note's Go key submits too) saves what it comes to.
+		if (sum) {
+			if (!equals()) {
+				cancel();
+				return;
+			}
+			formData.set('amount', amount);
 		}
 		busy = true;
 		error = '';
@@ -209,10 +263,23 @@
 				error = result.error?.message ?? 'That did not save.';
 				return;
 			}
-			if (result.type === 'redirect' && onDone) {
+			// The session ended, so nothing saved: go and sign in, and claim nothing.
+			if (result.type === 'redirect' && signsIn(result.location)) {
+				await update();
+				return;
+			}
+			// Offline: the service worker holds it, to send once Freyr is reachable.
+			const queued = result.type === 'success' && result.status === 202;
+			if ((result.type === 'redirect' || queued) && onDone) {
 				// Still busy: the sheet closes on onDone, and nothing may post before.
-				await invalidateAll();
-				onDone(txn ? `Saved ${summary}` : `Added ${summary}`, answers);
+				if (!queued) await invalidateAll();
+				const verb = txn ? 'Saved' : 'Added';
+				onDone(queued ? `${verb} ${summary} · syncs when online` : `${verb} ${summary}`, answers);
+				return;
+			}
+			// The edit page: back to the ledger, as a save would have gone.
+			if (queued && cancelHref) {
+				await goto(cancelHref);
 				return;
 			}
 			await update();
@@ -227,9 +294,18 @@
 		}
 		busy = true;
 		return async ({ result, update }) => {
-			if (result.type === 'redirect' && onDone) {
-				await invalidateAll();
-				onDone('Transaction deleted', {});
+			if (result.type === 'redirect' && signsIn(result.location)) {
+				await update();
+				return;
+			}
+			const queued = result.type === 'success' && result.status === 202;
+			if ((result.type === 'redirect' || queued) && onDone) {
+				if (!queued) await invalidateAll();
+				onDone(queued ? 'Delete syncs when online' : 'Transaction deleted', {});
+				return;
+			}
+			if (queued && cancelHref) {
+				await goto(cancelHref);
 				return;
 			}
 			await update();
@@ -280,6 +356,7 @@
 				<input
 					id="{uid}-amount"
 					name="amount"
+					bind:this={amountInput}
 					bind:value={amount}
 					inputmode={pad ? 'none' : 'decimal'}
 					autocomplete="off"
@@ -289,6 +366,7 @@
 					aria-describedby={error ? `${uid}-err` : undefined}
 					data-autofocus={pad ? undefined : ''}
 				/>
+				{#if worked}<output class="worked" for="{uid}-amount">= {worked}</output>{/if}
 			</div>
 		</div>
 
@@ -440,7 +518,9 @@
 		<!--
 		  The phone's keypad: digits, 00 and the point write into the amount
 		  above; the tall key submits. Always in reach of the thumb, and never
-		  covering the category it has to be filed under.
+		  covering the category it has to be filed under. A quiet column of
+		  operators makes it a calculator; while a sum is on it, the tall key
+		  is = and works it out.
 		-->
 		<div class="keypad" role="group" aria-label="Amount keypad">
 			{#each ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '00'] as k (k)}
@@ -451,15 +531,25 @@
 					aria-label={k === '.' ? 'Decimal point' : k === '00' ? 'Double zero' : k}>{k}</button
 				>
 			{/each}
-			<button
-				class="key key-del"
-				type="button"
-				onclick={() => press('del')}
-				aria-label="Delete last digit"
-			>
+			{#each OPERATORS as op, i (op)}
+				<button
+					class="key key-op"
+					type="button"
+					style:grid-row={i + 1}
+					onclick={() => press(op)}
+					aria-label={OPERATOR_NAMES[op]}>{op}</button
+				>
+			{/each}
+			<button class="key key-del" type="button" onclick={() => press('del')} aria-label="Backspace">
 				<Icon name="delete" size={22} />
 			</button>
-			<button class="key key-ok" type="submit" disabled={busy}>{txn ? 'Save' : 'Add'}</button>
+			{#if sum}
+				<button class="key key-ok eq" type="button" onclick={equals} aria-label="Work out the sum"
+					>=</button
+				>
+			{:else}
+				<button class="key key-ok" type="submit" disabled={busy}>{txn ? 'Save' : 'Add'}</button>
+			{/if}
 		</div>
 	{/if}
 </form>

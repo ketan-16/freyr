@@ -41,7 +41,8 @@ rationale and [ARCHITECTURE.md](ARCHITECTURE.md) for how it's put together.
 - **Categories** — one column per bucket or income source, each with its own add field. Renaming
   carries every transaction filed under it; a category the ledger still points at can only be
   archived; delete is offered only where nothing would lose its label.
-- **Settings** — the way into Splits and Categories, the theme, the account, and the keyboard map.
+- **Settings** — the way into Splits and Categories, the theme (System, Light or Dark), the
+  account, and the keyboard map.
 
 ## Interface
 
@@ -52,8 +53,10 @@ colour money figures, and amber marks focus and caution.
 - **Add from anywhere** — the sidebar's _New transaction_, the phone's centre tab, or `N` opens the
   add sheet (a bottom sheet on a phone): direction, amount, bucket, a category chip, date, note.
   On a phone it has its own amount keypad with a big Add key, so the system keyboard never covers
-  the form. It saves without leaving the page, refreshes the figures underneath in place, and
-  starts the next entry from the last one's answers.
+  the form — and the keypad is a calculator: `÷ × − +` build a sum (`1,200 + 45 × 3`), the field
+  shows what it comes to, and the Add key becomes `=` until it is worked out. It saves without
+  leaving the page, refreshes the figures underneath in place, and starts the next entry from
+  the last one's answers.
 - **Edit and delete** — any transaction row opens the same sheet with its values; delete takes a
   confirming second press. Rows linked to a goal or a lending keep their direction.
 - **⌘K** jumps to any screen, any recent month or year, or runs an action. `g` then a letter
@@ -61,8 +64,18 @@ colour money figures, and amber marks focus and caution.
   ledger. The full map is on the Settings screen.
 - **Charts** read on hover and on keyboard focus, and every chart has a table on the same screen
   that carries its figures.
-- **Light and dark** are both first-class; the theme is a cookie resolved during server render, so
-  there is no flash and the toggle works with JavaScript off.
+- **Light and dark** are both first-class. The theme is **System**, **Light** or **Dark** — in
+  Settings, the sidebar's theme menu and ⌘K. It is a cookie resolved during server render, so
+  there is no flash; System (no cookie) follows the device. It applies the moment it is chosen,
+  and works with JavaScript off.
+- **Installable, and works offline** — Freyr is a PWA: add it to the home screen and it opens
+  like an app. It is online first: every screen loads from the server when it can, and the copy
+  it got is kept on the device. With no connection, or the box down, the screens you have opened
+  (and every main screen, kept after each release and each sync) still open, marked _Offline_;
+  anything you add, edit or delete waits on the device, in order, and is sent the moment Freyr is
+  reachable again — then the page refreshes. A sync status in the sidebar (the app bar on a
+  phone) shows what is waiting, and anything the server refused, with Retry and Discard. It needs
+  HTTPS (or `localhost`) — see Self-hosting.
 - **Works without JavaScript** — every screen renders on the server and every write is a form:
   the add controls fall back to the ledger's entry bar, a row to its own edit page
   (`/ledger/:id`), the month picker is a native popover of links.
@@ -109,7 +122,10 @@ yearly sums) to cross-check against the sheet, plus notes about skipped/deduplic
 
 The app folder + `freyr.db` is the whole installation — any box with Node runs it. Freyr
 listens on all interfaces by default and does not terminate TLS; reach it over a trusted LAN or a
-Tailscale/WireGuard address (see STACK.md's serving posture). Daily `VACUUM INTO` snapshots
+Tailscale/WireGuard address (see STACK.md's serving posture). Browsers run the offline support
+(the service worker) only over HTTPS or on `localhost`: behind an HTTPS reverse proxy (e.g.
+Caddy) Freyr installs and works offline; on a plain-HTTP address it works exactly as before,
+online only. Daily `VACUUM INTO` snapshots
 land in `backups/` (last 30 kept) — **that folder must live in or sync to a replicated
 location** (Syncthing, Drive, …) so a dead disk can't take the app and its backups together.
 

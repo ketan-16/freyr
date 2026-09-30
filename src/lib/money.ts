@@ -81,13 +81,48 @@ export function groupTyped(typed: string): string {
 /** Whole-rupee digits the keypad accepts: up to ₹99,99,99,999. */
 const KEYPAD_WHOLE_DIGITS = 9;
 
+/** The keypad's calculator keys, as they read on the key and in the field. */
+export const OPERATORS = ['÷', '×', '−', '+'] as const;
+export type Operator = (typeof OPERATORS)[number];
+
+/** Operators sit between spaces in a typed sum: "1,200 + 45 × 3". */
+const OPERATOR_GAP = / ([÷×−+]) /;
+
+function isOperator(key: string): key is Operator {
+	return (OPERATORS as readonly string[]).includes(key);
+}
+
+/** Whether a typed amount is a sum still to be worked out. */
+export function hasOperator(typed: string): boolean {
+	return OPERATOR_GAP.test(typed);
+}
+
 /**
  * One press of the phone keypad applied to a typed amount: a digit, "00",
- * "." or "del". String work only — the amount never becomes a number here —
- * and the result is always something parseMoney accepts once it has a digit:
- * one point, at most two decimals, no leading zeros, grouped for reading.
+ * ".", "del", or one of the four operators, which start the next number of
+ * a sum. String work only — nothing becomes a number here. A digit edits the
+ * last number in the sum under the same rules as a lone amount; an operator
+ * after an operator replaces it, and none can come first.
  */
 export function keyAmount(typed: string, key: string): string {
+	// [number, operator, number, …]: split keeps the operators it splits on.
+	const parts = typed.split(OPERATOR_GAP);
+	const last = parts.length - 1;
+	const join = (list: string[]) => list.map((p, i) => (i % 2 ? ` ${p} ` : p)).join('');
+
+	if (isOperator(key)) {
+		if (parts[last] !== '') return `${typed} ${key} `;
+		if (last === 0) return typed;
+		parts[last - 1] = key;
+		return join(parts);
+	}
+	if (key === 'del' && parts[last] === '' && last > 0) return join(parts.slice(0, -2));
+	parts[last] = keyNumber(parts[last], key);
+	return join(parts);
+}
+
+/** One key applied to a single typed number: one point, two decimals, no leading zeros, grouped. */
+function keyNumber(typed: string, key: string): string {
 	let raw = typed.replaceAll(',', '');
 	if (key === 'del') {
 		raw = raw.slice(0, -1);
@@ -103,6 +138,69 @@ export function keyAmount(typed: string, key: string): string {
 		}
 	}
 	return groupTyped(raw);
+}
+
+/** The most a worked-out sum may come to: the most the keypad can type, ₹99,99,99,999.99. */
+const KEYPAD_MAX = 10n ** BigInt(KEYPAD_WHOLE_DIGITS + 2) - 1n;
+
+/** A value in paise as an exact fraction, n / d with d > 0. */
+type Fraction = { n: bigint; d: bigint };
+
+/**
+ * Works out a typed sum ("1,200 + 45 × 3") to paise: × and ÷ before + and −,
+ * left to right, in exact fractions — BigInt, so no product can overflow —
+ * rounded once at the end, half away from zero, like mulBP. A trailing
+ * operator is ignored. Throws, in words a form can show, on ÷ 0 and on a
+ * total that is not an amount the keypad could have typed.
+ */
+export function evaluateAmount(typed: string): Paise {
+	const parts = typed.split(OPERATOR_GAP);
+	if (parts.length > 1 && parts.at(-1) === '') parts.splice(-2);
+	const value = (s: string): Fraction => ({ n: BigInt(parseMoney(s)), d: 1n });
+
+	// × and ÷ fold into the term before them; what is left is a run of + and −.
+	const terms: Fraction[] = [value(parts[0])];
+	const signs: Operator[] = [];
+	for (let i = 1; i < parts.length; i += 2) {
+		const op = parts[i] as Operator;
+		const b = value(parts[i + 1]);
+		if (op === '+' || op === '−') {
+			signs.push(op);
+			terms.push(b);
+			continue;
+		}
+		const a = terms.pop()!;
+		if (op === '×') {
+			// Rupees × rupees, in paise: (a / 100) × (b / 100) × 100.
+			terms.push({ n: a.n * b.n, d: a.d * b.d * 100n });
+		} else {
+			if (b.n === 0n) throw new Error('Can’t divide by zero.');
+			// (a / 100) ÷ (b / 100) × 100, kept with a positive denominator.
+			const sign = b.n < 0n ? -1n : 1n;
+			terms.push({ n: sign * a.n * b.d * 100n, d: sign * a.d * b.n });
+		}
+	}
+	let total = terms[0];
+	terms.slice(1).forEach((t, i) => {
+		const n = total.n * t.d + (signs[i] === '+' ? 1n : -1n) * t.n * total.d;
+		total = { n, d: total.d * t.d };
+	});
+
+	const paise = roundHalfAway(total.n, total.d);
+	if (paise <= 0n)
+		throw new Error(
+			`That comes to ${formatMoney(Number(paise))}; an amount has to be more than ₹0.`
+		);
+	if (paise > KEYPAD_MAX) throw new Error('That comes to more than ₹99,99,99,999.99.');
+	return Number(paise);
+}
+
+/** n / d to the nearest integer, halves away from zero (d > 0). */
+function roundHalfAway(n: bigint, d: bigint): bigint {
+	const q = n / d; // BigInt division truncates toward zero
+	const r = n % d;
+	if (2n * (r < 0n ? -r : r) < d) return q;
+	return n < 0n ? q - 1n : q + 1n;
 }
 
 function groupIndian(digits: string): string {

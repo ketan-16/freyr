@@ -1002,6 +1002,8 @@ input.pct {
 	.chips label,
 	.seg label,
 	.seg a,
+	.seg button,
+	.menu-list button,
 	.key,
 	.btn,
 	.icon-btn,
@@ -1128,23 +1130,29 @@ input.pct {
 	width: 100%;
 }
 
-/* Link-driven segments (a filter): the same look with anchors. */
-.seg a {
+/* Link-driven segments (a filter) and button-driven ones (a setting that
+   saves on press): the same look with anchors or submit buttons. */
+.seg a,
+.seg button {
 	display: flex;
 	align-items: center;
 	gap: 6px;
 	padding: 0 var(--s-2);
+	border: 0;
 	border-radius: var(--r-sm);
+	background: none;
 	color: var(--ink-2);
 	font-weight: 500;
 	white-space: nowrap;
 }
 
-.seg a:hover {
+.seg a:hover,
+.seg button:hover {
 	color: var(--ink);
 }
 
-.seg a[aria-current='true'] {
+.seg a[aria-current='true'],
+.seg button[aria-pressed='true'] {
 	background: var(--seg-on);
 	box-shadow:
 		var(--shadow-sm),
@@ -2078,6 +2086,8 @@ dialog[open] {
 }
 
 .amount-field input {
+	flex: 1;
+	min-width: 0;
 	height: 100%;
 	padding: 0;
 	border: 0 !important;
@@ -2095,6 +2105,16 @@ dialog[open] {
 	gap: var(--s-3);
 }
 
+/* What a keypad sum comes to, beside it, until = puts it in its place. */
+.amount-field .worked {
+	flex: none;
+	color: var(--ink-3);
+	font-size: var(--t-md);
+	font-weight: 500;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
 .amount-field input::placeholder {
 	color: var(--ink-faint);
 	font-weight: 500;
@@ -2105,12 +2125,13 @@ dialog[open] {
 	border-color: var(--ink);
 }
 
-/* The phone's amount keypad: three columns of keys, delete and a tall submit
-   on the fourth. Rendered only on a phone, inside the add sheet. */
+/* The phone's amount keypad: three columns of digits, a narrower one of
+   operators, then delete and a tall submit. Rendered only on a phone, inside
+   the add sheet. */
 .keypad {
 	display: grid;
 	flex: none;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 0.75fr) minmax(0, 1fr);
 	/* Shorter keys on a short phone, so the fields above keep their room. */
 	grid-auto-rows: clamp(2.5rem, 6.2dvh, 3.25rem);
 	gap: 6px;
@@ -2142,14 +2163,23 @@ dialog[open] {
 	background: var(--active);
 }
 
-.key-del {
+/* The calculator's keys sit flat in the tray: there, not competing. */
+.key-op {
 	grid-column: 4;
+	background: none;
+	box-shadow: inset 0 0 0 1px var(--line-2);
+	color: var(--ink-2);
+	font-size: 1.25rem;
+}
+
+.key-del {
+	grid-column: 5;
 	grid-row: 1;
 	color: var(--ink-2);
 }
 
 .key-ok {
-	grid-column: 4;
+	grid-column: 5;
 	grid-row: 2 / span 3;
 	background: var(--ink);
 	box-shadow: none;
@@ -2164,6 +2194,11 @@ dialog[open] {
 
 .key-ok:disabled {
 	opacity: 0.5;
+}
+
+.key-ok.eq {
+	font-size: 1.625rem;
+	font-weight: 500;
 }
 
 .sheet .linked {
@@ -2337,6 +2372,157 @@ dialog[open] {
 
 .picker .btn.block {
 	margin-top: var(--s-2);
+}
+
+/* The sidebar's theme menu: the month picker's popover, as a short list. */
+.theme-pop {
+	width: 10rem;
+	padding: var(--s-1);
+}
+
+.menu-list {
+	display: grid;
+	gap: 1px;
+}
+
+.menu-list button {
+	display: flex;
+	align-items: center;
+	gap: var(--s-2);
+	height: 2rem;
+	padding: 0 var(--s-2);
+	border: 0;
+	border-radius: var(--r);
+	background: none;
+	color: var(--ink-2);
+	font-weight: 500;
+	text-align: left;
+}
+
+.menu-list button span {
+	flex: 1;
+}
+
+.menu-list button:hover {
+	background: var(--hover);
+	color: var(--ink);
+}
+
+.menu-list button[aria-pressed='true'] {
+	color: var(--ink);
+}
+
+/* ---- Offline and sync ----------------------------------------------------- */
+
+/* Shown only when there is something to say: offline, waiting, refused. */
+.sync-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 1.5rem;
+	padding: 0 var(--s-2);
+	border: 1px solid var(--line-2);
+	border-radius: var(--r);
+	background: var(--surface);
+	color: var(--ink-2);
+	font-size: var(--t-sm);
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+.sync-chip:hover {
+	border-color: var(--line-strong);
+	color: var(--ink);
+}
+
+.sync-chip.warn {
+	border-color: var(--warn-line);
+	background: var(--warn-bg);
+	color: var(--warn);
+}
+
+.sync-chip.spin svg {
+	animation: spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.sync-chip.spin svg {
+		animation: none;
+	}
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(1turn);
+	}
+}
+
+/* The sidebar's is a row above the account; the app bar's is for phones only. */
+.side .sync-chip {
+	width: 100%;
+	margin-bottom: var(--s-2);
+}
+
+.ph .sync-chip {
+	display: none;
+}
+
+.sync-pop {
+	width: 18rem;
+}
+
+.sync-lead {
+	margin: 0;
+	color: var(--ink-2);
+	font-size: var(--t-sm);
+}
+
+.sync-pop h3 {
+	margin: var(--s-3) 0 var(--s-1);
+	color: var(--ink-3);
+	font-size: var(--t-sm);
+	font-weight: 500;
+}
+
+.sync-list {
+	display: grid;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.sync-list li {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	align-items: center;
+	column-gap: var(--s-2);
+	padding: var(--s-1) 0;
+	border-top: 1px solid var(--line);
+}
+
+.sync-list .what {
+	min-width: 0;
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+
+.sync-list .why {
+	grid-column: 1;
+	color: var(--ink-3);
+	font-size: var(--t-sm);
+}
+
+.sync-list .acts {
+	display: flex;
+	grid-row: 1 / span 2;
+	grid-column: 2;
+	gap: 2px;
+}
+
+.sync-list .btn {
+	height: 1.5rem;
+	padding: 0 var(--s-2);
+	font-size: var(--t-sm);
 }
 
 /* ---- Month and year stepping ----------------------------------------------- */
@@ -3158,6 +3344,26 @@ a.set-item:hover {
 .set-item.short {
 	min-height: 2.5rem;
 }
+.set-item.wrap {
+	flex-wrap: wrap;
+	row-gap: var(--s-2);
+}
+.set-item.wrap .txt {
+	flex-basis: 12rem;
+}
+@media (max-width: 40rem) {
+	/* On a phone the control takes a line of its own, full width. */
+	.set-item.wrap > form {
+		flex: 1 0 100%;
+	}
+	.set-item.wrap .seg {
+		display: flex;
+	}
+	.set-item.wrap .seg button {
+		flex: 1;
+		justify-content: center;
+	}
+}
 .set-item .keys {
 	display: flex;
 	gap: 3px;
@@ -3231,6 +3437,7 @@ a.set-item:hover {
 	.side-new kbd,
 	.nav-item span,
 	.nav-label,
+	.side .sync-chip span,
 	.who {
 		display: none;
 	}
@@ -3254,6 +3461,13 @@ a.set-item:hover {
 	.side-foot {
 		flex-direction: column;
 		padding: var(--s-2) 0 0;
+	}
+
+	.side .sync-chip {
+		justify-content: center;
+		width: var(--h);
+		height: var(--h);
+		padding: 0;
 	}
 }
 
@@ -3301,8 +3515,13 @@ a.set-item:hover {
 		font-weight: 500;
 	}
 
-	.ph-gear {
+	.ph-gear,
+	.ph .sync-chip {
 		order: 2;
+	}
+
+	.ph .sync-chip {
+		display: inline-flex;
 	}
 
 	.ph-actions {

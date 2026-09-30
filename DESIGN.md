@@ -30,7 +30,9 @@ The system is an instrument panel, not a brochure:
 - **Progressive enhancement.** Every screen renders on the server and every write is a form
   action; script makes it instant (sheets, in-place refresh, filtering) but is never required.
 - **Two themes, one app.** Light and dark carry the same density, components and information;
-  the theme is a cookie resolved during SSR, so there is no flash.
+  the setting is System, Light or Dark, a cookie resolved during SSR, so there is no flash.
+- **Online first, never stranded.** Offline, the screens still open from what the device kept
+  and writes wait on it; the app says so, plainly, only while it is true.
 
 **Deliberately not here** — the generic "AI dashboard" look: purple/violet gradients, emoji as
 icons, glassmorphism, oversized uniform rounding, hero text centred on ordinary screens,
@@ -46,10 +48,11 @@ as a steward who holds a light over your money. It is traced from the original a
 stays legible at sidebar size. One cut, `viewBox 0 0 200 464`, silhouette on `currentColor`, flame fixed
 at `--flame` (`#E7A34A`).
 
-| Asset                                 | Use                                                             |
-| ------------------------------------- | --------------------------------------------------------------- |
-| `src/lib/components/FreyrMark.svelte` | Sidebar (22px), auth cards (40px) — inherits ink from context   |
-| `static/favicon.svg`                  | Browser tab; flips to light-on-dark with `prefers-color-scheme` |
+| Asset                                       | Use                                                                                                                                                                   |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/components/FreyrMark.svelte`       | Sidebar (22px), auth cards (40px) — inherits ink from context                                                                                                         |
+| `static/favicon.svg`                        | Browser tab; flips to light-on-dark with `prefers-color-scheme`                                                                                                       |
+| `static/icon-*.png`, `apple-touch-icon.png` | Home screen: the mark in `#EDEDEF` with its flame, centred on `#111113` — the lantern in the dark. 62% of the height; 50% on the maskable cut, inside its safe circle |
 
 **Wordmark:** `FREYR`, UI sans, weight 650, tracking `0.14em`, uppercase — the one place uppercase
 appears. Never recolour the flame, never stretch the mark (it is 1 : 2.32 and pads), no shadow.
@@ -60,7 +63,9 @@ Lucide (`lucide-static` 0.544.0, ISC), inlined as path data in `Icon.svelte` —
 sprite, no CDN. One set, a 1.75 stroke at 16px (2.25 on the add glyph), `currentColor`, always
 `aria-hidden`; every icon-only control carries an `aria-label` and a `title`. Screens: `house`
 Home, `arrow-left-right` Ledger, `chart-pie` Budget, `chart-column` Year, `sliders-horizontal`
-Splits, `tags` Categories, `settings`. Never emoji, never a second set.
+Splits, `tags` Categories, `settings`. Theme: `monitor` System, `sun` Light, `moon` Dark. Sync:
+`cloud-off` offline, `refresh-cw` waiting or syncing, `cloud-alert` refused or signed out.
+Never emoji, never a second set.
 
 ---
 
@@ -209,8 +214,10 @@ page stays in place underneath — no skeletons.
 
 **Sidebar** (`.side`): brand; _Jump to…_ (opens the command menu, `⌘K`); _New transaction_
 (`N`); the four screens — Home, Ledger, Budget, Year; a Settings group — Splits, Categories; and
-a foot with the account initial (a link to Settings), the theme toggle and log out. The current
-item is `--active` with ink text. At ≤ 64rem it is a 3.5rem icon rail with titles.
+a foot with the account initial (a link to Settings), the theme menu and log out; above the
+foot, the sync status when there is one. The theme menu is one icon button showing the current
+setting, opening a small popover list — System, Light, Dark, a check on the one in use. The
+current item is `--active` with ink text. At ≤ 64rem it is a 3.5rem icon rail with titles.
 
 **Page header** (`PageHeader.svelte`, `.ph`): sticky, 52px, `h1` plus a context line (the period
 or count it shows), then the screen's own controls on the right — the month stepper, the year
@@ -233,33 +240,35 @@ an optional six-month sparkline beside the value.
 
 ## Components
 
-| Vocabulary       | Code                                                            |
-| ---------------- | --------------------------------------------------------------- |
-| page-header      | `PageHeader.svelte` — `.ph`, `.ph-title`, `.ph-actions`         |
-| stepper          | `Stepper.svelte` — `.stepper`; `MonthNav.svelte` adds a picker  |
-| month picker     | `.picker` popover, `.picker-grid`                               |
-| panel            | `.panel`, `.panel-h`, `.panel-b`, `.panel-f`, `.panel-note`     |
-| kpi              | `Kpi.svelte` in `.kpis`                                         |
-| hero             | `.hero`, `.hero-fig`, `.facts` (home)                           |
-| bullet           | `Bullet.svelte` — `.bullet` with `.fill`, `.over`, `.mark`      |
-| share bar        | `ShareBar.svelte` — `.share-bar`                                |
-| ranks            | `Ranks.svelte` — `table.ranks`                                  |
-| sparkline        | `Sparkline.svelte` — `svg.spark`                                |
-| money            | `Money.svelte`                                                  |
-| delta            | `Delta.svelte` — `.delta` (`.pos` / `.neg` / `.flat`)           |
-| bucket label     | `.bk` + bucket class; `.sw` is the bare swatch                  |
-| tag              | `.tag` (`.strong` for "in force")                               |
-| table            | `table.tbl` (`.num`, `.grow`, `.first`, `.last`, `tr.current`)  |
-| statement        | `table.t-txn` with one `tbody.day` per day                      |
-| entry bar        | `EntryBar.svelte` — `.entry-wrap`, `.entry`                     |
-| transaction form | `TxnForm.svelte` — `.txn-form`, `.amount-field`, `.chips`       |
-| sheet            | `TxnSheet.svelte` — `dialog.sheet`                              |
-| command menu     | `CommandMenu.svelte` — `dialog.cmd`                             |
-| toasts           | `.toasts` / `.toast` in the layout                              |
-| notice           | `Notice.svelte` — `.notice.info` / `.notice.warn`               |
-| buttons          | `.btn` (`.primary`, `.ghost`, `.danger`, `.block`), `.icon-btn` |
-| segmented        | `.seg` — radios, or links with `aria-current` for a filter      |
-| fields           | `.field`, `.label`, `.affix` (`.pre` ₹ / `.post` %)             |
+| Vocabulary       | Code                                                                                                                          |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| page-header      | `PageHeader.svelte` — `.ph`, `.ph-title`, `.ph-actions`                                                                       |
+| stepper          | `Stepper.svelte` — `.stepper`; `MonthNav.svelte` adds a picker                                                                |
+| month picker     | `.picker` popover, `.picker-grid`                                                                                             |
+| panel            | `.panel`, `.panel-h`, `.panel-b`, `.panel-f`, `.panel-note`                                                                   |
+| kpi              | `Kpi.svelte` in `.kpis`                                                                                                       |
+| hero             | `.hero`, `.hero-fig`, `.facts` (home)                                                                                         |
+| bullet           | `Bullet.svelte` — `.bullet` with `.fill`, `.over`, `.mark`                                                                    |
+| share bar        | `ShareBar.svelte` — `.share-bar`                                                                                              |
+| ranks            | `Ranks.svelte` — `table.ranks`                                                                                                |
+| sparkline        | `Sparkline.svelte` — `svg.spark`                                                                                              |
+| money            | `Money.svelte`                                                                                                                |
+| delta            | `Delta.svelte` — `.delta` (`.pos` / `.neg` / `.flat`)                                                                         |
+| bucket label     | `.bk` + bucket class; `.sw` is the bare swatch                                                                                |
+| tag              | `.tag` (`.strong` for "in force")                                                                                             |
+| table            | `table.tbl` (`.num`, `.grow`, `.first`, `.last`, `tr.current`)                                                                |
+| statement        | `table.t-txn` with one `tbody.day` per day                                                                                    |
+| entry bar        | `EntryBar.svelte` — `.entry-wrap`, `.entry`                                                                                   |
+| transaction form | `TxnForm.svelte` — `.txn-form`, `.amount-field`, `.chips`                                                                     |
+| sheet            | `TxnSheet.svelte` — `dialog.sheet`                                                                                            |
+| command menu     | `CommandMenu.svelte` — `dialog.cmd`                                                                                           |
+| toasts           | `.toasts` / `.toast` in the layout                                                                                            |
+| notice           | `Notice.svelte` — `.notice.info` / `.notice.warn`                                                                             |
+| theme            | `ThemeSwitch.svelte` (`.seg` of buttons, or `.menu-list`); `ThemeToggle.svelte` puts it in the sidebar's `.theme-pop`         |
+| sync status      | `SyncStatus.svelte` — `.sync-chip` (`.warn`, `.spin`) opening `.sync-pop`                                                     |
+| buttons          | `.btn` (`.primary`, `.ghost`, `.danger`, `.block`), `.icon-btn`                                                               |
+| segmented        | `.seg` — radios; links with `aria-current` for a filter; submit buttons with `aria-pressed` for a setting that saves on press |
+| fields           | `.field`, `.label`, `.affix` (`.pre` ₹ / `.post` %)                                                                           |
 
 ### Figures
 
@@ -323,16 +332,46 @@ a middle-click and script-off all work.
   decimal keypad has no return key and would cover the bucket, the category and the submit. The
   amount field then never raises the system keyboard (`inputmode="none"`); the fields scroll above
   the keypad and the keypad stays above the home indicator. The keypad's arithmetic is string work
-  in `keyAmount` (`money.ts`): one point, two decimals, no leading zeros, grouped as it grows. While
-  a save is in flight the sheet holds: a
+  in `keyAmount` (`money.ts`): one point, two decimals, no leading zeros, grouped as it grows.
+  **The keypad is also a calculator**: a narrower fourth column of `÷ × − +` keys sits flat in the
+  tray (outlined, `--ink-2`), so the digits keep their weight and the sheet gains no height. An
+  operator starts the next number of a sum (`1,200 + 45 × 3`, each number grouped on its own); a
+  second operator replaces the first, none can come first, and delete walks back through both.
+  While a sum is on the keypad the field shows what it comes to, faintly on its right
+  (`= ₹1,335`), and the tall key is `=`: it puts the result in the field and turns back into Add.
+  A sum that cannot be an amount (÷ 0, ₹0 or less, over ₹99,99,99,999.99) says so where the
+  form's errors go. Submitting with a sum still on it (the note's Go key) saves what it comes
+  to. While a save is in flight the sheet holds: a
   second submit is dropped and it cannot be dismissed, so an entry is never posted twice or lost.
   Only a press that starts on the backdrop closes it — a text selection dragged out of a field
   does not.
 - **Command menu** (`CommandMenu.svelte`): `⌘K`. Screens with their `g` shortcuts, actions (new
-  transaction, switch theme, log out), and — once you type — the last twelve months of Budget and
-  Ledger and the last three years. `↑ ↓` move, `↵` runs. It navigates; it never fetches.
+  transaction, log out), the two theme settings not in use, and — once you type — the last
+  twelve months of Budget and Ledger and the last three years. `↑ ↓` move, `↵` runs. It
+  navigates; it never fetches.
 - **Toasts**: ink, bottom right (above the tab bar on a phone), 4s, `role="status"` — a
-  confirmation that something saved.
+  confirmation that something saved. Saved offline, it says so: _Added ₹120 · Food · syncs when
+  online_; when the queue drains, _Synced 2 changes made offline_.
+
+### Sync status
+
+`SyncStatus.svelte` renders **nothing while all is well** — online, nothing waiting. Otherwise a
+small chip (`.sync-chip`, `--t-sm`, 24px, `--r`), in the sidebar above the account foot (icon
+only in the rail) and in a phone's app bar beside the gear:
+
+| State                  | Chip                            | Tone                                           |
+| ---------------------- | ------------------------------- | ---------------------------------------------- |
+| Signed out with writes | `cloud-alert` Sign in to sync   | warn (`--warn` on `--warn-bg`)                 |
+| Refused by the server  | `cloud-alert` N not saved       | warn                                           |
+| Offline                | `cloud-off` Offline · N waiting | neutral                                        |
+| Sending                | `refresh-cw` Syncing…           | neutral, icon turns (not under reduced motion) |
+| Waiting, online        | `refresh-cw` N waiting          | neutral                                        |
+
+It opens a popover (`.sync-pop`, 18rem): one sentence on the state, then each refused write (what
+it was, the server's reason, Retry, Discard) and each waiting one (what it was, when, Discard),
+and _Sync now_. A write is named in words — "Add ₹120 · Food", "Rename a category to Rent" — never
+as a URL. Offline, a screen never kept is an in-app notice (header _Offline_, no status code)
+with the way back to Home.
 
 ---
 
@@ -388,7 +427,7 @@ An empty chart says so in a sentence rather than drawing an axis of zeros.
 Single-key shortcuts never fire while a field has focus or a dialog is open. **Script off**, every screen
 still renders and every write still works: the add controls are links to the ledger's entry bar
 (`/ledger#new`), a row is a link to its edit page, the month picker is a native popover of links,
-filters are links, and the theme toggle is a form.
+filters are links, and the theme setting is a form of three submit buttons.
 
 **Motion** is feedback only, ≤ 200ms: the sheet rises (fades on a desktop), the picker and toasts
 fade in, hovers ease. `prefers-reduced-motion` removes all of it.
@@ -406,7 +445,8 @@ fade in, hovers ease. `prefers-reduced-motion` removes all of it.
 On a phone: the ledger is a two-line list (what and how much; then bucket and note) under
 sunk day headers; Recent on home is the same shape; KPIs go two to a row without sparklines;
 bucket rows put the bar on its own line; the sheet is a bottom sheet over the tab bar with its own
-amount keypad; the browser's tap flash is off on controls that show their own pressed state; the entry
+amount keypad and its calculator column; the theme setting takes a line of its own; the browser's
+tap flash is off on controls that show their own pressed state; the entry
 bar only appears when linked to or after a failed submit. Wide tables (plan vs actual, month by
 month, periods) scroll sideways inside their panel. The tab bar reserves
 `env(safe-area-inset-bottom)`.
@@ -448,5 +488,8 @@ set (Lucide only, inline, `currentColor`).
 - **The categorical palette is capped at three series** (the buckets). A fourth series must fold
   into "Other" or facet, per the palette's validation.
 - **No undo.** A delete is guarded by a two-step confirm, not reversible afterwards.
+- **What changed offline is not in the figures until it syncs.** The sync status lists it; the
+  charts and totals are the server's, as last kept. There is no optimistic copy of the domain
+  rules in the browser.
 - **Print styles** only hide chrome; a year-end statement sheet would need its own pass.
 - **The mark is a trace, not a redraw** — faithful to the source artwork, asymmetries included.

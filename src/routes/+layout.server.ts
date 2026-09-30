@@ -4,8 +4,9 @@ import type { LayoutServerLoad } from './$types';
 export const load: LayoutServerLoad = ({ locals }) => {
 	return {
 		user: locals.user,
-		// The toggle needs a concrete value to invert; the *rendering* of the
-		// theme is handled by <html data-theme> in hooks.server.ts, not here.
+		// The pair seeds the shell's theme setting: `themeChosen` false is
+		// "System". The *rendering* of the theme is handled by <html data-theme>
+		// in hooks.server.ts, not here.
 		theme: locals.theme ?? 'light',
 		// Whether that theme was chosen, or is a guess while the OS decides.
 		themeChosen: locals.theme != null,

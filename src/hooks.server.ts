@@ -1,11 +1,13 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { building } from '$app/environment';
 import { env } from '$env/dynamic/private';
+import { KEY_HEADER } from '$lib/offline';
 import { sessionUser, userCount } from '$lib/server/auth';
 import { startBackupTimer } from '$lib/server/backup';
 import { isCrossSiteWrite } from '$lib/server/csrf';
 import { migrate, open } from '$lib/server/db';
 import { rebuildProjectedPeriods } from '$lib/server/promotions';
+import { isReplayKey, replayGuard } from '$lib/server/replay';
 import { error, redirect, type Handle } from '@sveltejs/kit';
 
 let db: DatabaseSync | undefined;
@@ -30,6 +32,9 @@ function getDb(): DatabaseSync {
 const PUBLIC_PATHS = new Set(['/login', '/setup']);
 /** Reachable whether or not you are signed in — neither redirect applies. */
 const ALWAYS_PATHS = new Set(['/theme']);
+
+/** Writes replayed from a device's offline queue apply once ($lib/server/replay). */
+const once = replayGuard();
 
 /** Stamp the resolved theme onto <html> during SSR so the first paint is right. */
 function withTheme(theme: 'light' | 'dark' | null) {
@@ -65,6 +70,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (event.locals.user && PUBLIC_PATHS.has(path)) {
 			redirect(303, '/');
 		}
+	}
+
+	// Only a signed-in write can be replayed; the key is scoped to its user.
+	const key = event.request.method === 'POST' ? event.request.headers.get(KEY_HEADER) : null;
+	if (event.locals.user && isReplayKey(key)) {
+		const user = event.locals.user;
+		return once(`${user.id}:${key}`, () => resolve(event, withTheme(event.locals.theme)));
 	}
 
 	return resolve(event, withTheme(event.locals.theme));

@@ -1,50 +1,45 @@
 <!--
-  Theme switch as a form action, not client state: it works with JavaScript off
-  and survives a hard refresh. With no cookie set the OS decides the theme, and
-  the server cannot see which — so once the page runs, the target is read from
-  what is actually on screen. The icon shows the destination; the label says it.
+  The sidebar's theme control: one button showing the current setting, which
+  opens the three choices as a small menu. The menu is a native popover, so it
+  opens and light-dismisses with script off, and each choice is still a plain
+  post; script only anchors it above the button.
 -->
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/state';
+	import { anchorPopover, useUi } from '$lib/ui.svelte';
 	import Icon from './Icon.svelte';
+	import ThemeSwitch from './ThemeSwitch.svelte';
 
-	let {
-		theme,
-		withLabel = false,
-		id
-	}: { theme: 'light' | 'dark'; withLabel?: boolean; id?: string } = $props();
+	const ui = useUi();
+	const id = $props.id();
+	let pop = $state<HTMLElement>();
+	let button = $state<HTMLButtonElement>();
 
-	let shown = $state<'light' | 'dark' | null>(null);
-	onMount(() => {
-		const stamped = document.documentElement.dataset.theme;
-		shown =
-			stamped === 'dark' || stamped === 'light'
-				? stamped
-				: matchMedia('(prefers-color-scheme: dark)').matches
-					? 'dark'
-					: 'light';
+	const ICON = { system: 'monitor', light: 'sun', dark: 'moon' } as const;
+	const NAME = { system: 'System', light: 'Light', dark: 'Dark' } as const;
+
+	$effect(() => {
+		const el = pop;
+		if (!el) return;
+		const onToggle = (e: Event) => {
+			// Above the button: it sits at the foot of the sidebar. 160px is .theme-pop's width.
+			if ((e as ToggleEvent).newState === 'open' && button)
+				anchorPopover(el, button, { width: 160, side: 'above', align: 'start' });
+		};
+		el.addEventListener('beforetoggle', onToggle);
+		return () => el.removeEventListener('beforetoggle', onToggle);
 	});
-
-	const next = $derived((shown ?? theme) === 'dark' ? 'light' : 'dark');
-	const back = $derived(page.url.pathname + page.url.search);
 </script>
 
-<form method="POST" action="/theme" {id}>
-	<input type="hidden" name="to" value={next} />
-	<input type="hidden" name="back" value={back} />
-	{#if withLabel}
-		<button class="btn" type="submit">
-			<Icon name={next === 'dark' ? 'moon' : 'sun'} />Use {next} theme
-		</button>
-	{:else}
-		<button
-			class="icon-btn"
-			type="submit"
-			aria-label="Switch to {next} theme"
-			title="Switch to {next} theme"
-		>
-			<Icon name={next === 'dark' ? 'moon' : 'sun'} />
-		</button>
-	{/if}
-</form>
+<button
+	class="icon-btn"
+	type="button"
+	bind:this={button}
+	popovertarget="{id}-theme"
+	aria-label="Theme: {NAME[ui.theme]}"
+	title="Theme: {NAME[ui.theme]}"
+>
+	<Icon name={ICON[ui.theme]} />
+</button>
+<div class="picker theme-pop" id="{id}-theme" popover="auto" bind:this={pop}>
+	<ThemeSwitch menu onchoose={() => pop?.hidePopover()} />
+</div>

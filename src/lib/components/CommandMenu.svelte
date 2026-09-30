@@ -83,19 +83,31 @@
 		},
 		{
 			group: 'Actions',
-			label: 'Switch theme',
-			icon: 'moon',
-			terms: 'dark light appearance',
-			run: submit('theme-form')
-		},
-		{
-			group: 'Actions',
 			label: 'Log out',
 			icon: 'log-out',
 			terms: 'sign out',
 			run: submit('logout-form')
 		}
 	];
+
+	/** The two theme settings not in use — the third would do nothing. */
+	const themes = $derived(
+		(
+			[
+				{ value: 'system', label: 'Use system theme', icon: 'monitor', terms: 'auto os device' },
+				{ value: 'light', label: 'Use light theme', icon: 'sun', terms: 'mode' },
+				{ value: 'dark', label: 'Use dark theme', icon: 'moon', terms: 'mode night' }
+			] as const
+		)
+			.filter((t) => t.value !== ui.theme)
+			.map((t): Item => ({
+				group: 'Theme',
+				label: t.label,
+				icon: t.icon,
+				terms: `appearance ${t.terms}`,
+				run: () => ui.setTheme(t.value)
+			}))
+	);
 
 	/** The last twelve months and three years, found by typing. */
 	function periods(): Item[] {
@@ -136,8 +148,8 @@
 
 	const results = $derived.by(() => {
 		const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-		if (!words.length) return base;
-		return [...base, ...periods()].filter((item) => {
+		if (!words.length) return [...base, ...themes];
+		return [...base, ...themes, ...periods()].filter((item) => {
 			const hay = `${item.group} ${item.label} ${item.terms ?? ''}`.toLowerCase();
 			return words.every((w) => hay.includes(w));
 		});
