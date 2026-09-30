@@ -26,6 +26,7 @@ Finances v2.xlsx
 .playwright-mcp/
 
 # Credentials — key material must never be committed
+# (deploy SSH key for the Oracle Cloud box lives in cloud/ssh/, brought from ../hey/ssh)
 cloud/
 *.key
 *.pem

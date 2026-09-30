@@ -15,3 +15,39 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+
+  deploy:
+    # Continuous deploy: only after CI passes, and only on a push to main
+    # (never pull requests or other branches). Builds on the runner — the box is
+    # too small to run a Vite build — then ships build/ over SSH to a locked-down
+    # forced command (~/freyr/ci-deploy.sh) that swaps it in, restarts the
+    # service, health-checks, and rolls back on failure.
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: freyr-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' '80.225.209.182 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHobi2N0Hd7r7u5Jpk7vKbdth9IA1C4Qe4riXYDD6lxf' > ~/.ssh/known_hosts
+      - name: Deploy to the box
+        run: |
+          tar -czf - build package.json package-lock.json \
+            | ssh -i ~/.ssh/deploy_key -T \
+                -o StrictHostKeyChecking=yes \
+                -o UserKnownHostsFile=~/.ssh/known_hosts \
+                ubuntu@80.225.209.182
